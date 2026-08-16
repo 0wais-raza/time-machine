@@ -29,36 +29,19 @@ export default defineConfig({
     VitePWA({
       registerType: "autoUpdate",
       injectRegister: null,
-      filename: "sw.js",
+      filename: "sw.ts", // source; emitted as sw.js via useFilename resolution
+      srcDir: "src",
       manifest: false,
+      strategies: "injectManifest",
       // Nitro (Vercel) serves from .output/public — put the service worker there.
       outDir: ".output/public",
       devOptions: { enabled: false },
-      workbox: {
-        navigateFallback: "/",
-        navigateFallbackDenylist: [/^\/~oauth/, /^\/api\//],
-        globPatterns: ["**/*.{js,css,html,svg,png,ico,woff,woff2}"],
-        runtimeCaching: [
-          {
-            urlPattern: ({ request }) => request.mode === "navigate",
-            handler: "NetworkFirst",
-            options: { cacheName: "html-pages", networkTimeoutSeconds: 4 },
-          },
-          {
-            urlPattern: ({ request }) =>
-              ["style", "script", "worker", "font", "image"].includes(request.destination),
-            handler: "StaleWhileRevalidate",
-            options: { cacheName: "static-assets" },
-          },
-          {
-            urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\//,
-            handler: "CacheFirst",
-            options: {
-              cacheName: "google-fonts",
-              expiration: { maxEntries: 32, maxAgeSeconds: 60 * 60 * 24 * 365 },
-            },
-          },
-        ],
+      // Custom service worker (src/sw.ts): app-shell caching + a persisted
+      // notification scheduler so alerts fire even when the tab is closed
+      // (while the browser is running).
+      injectManifest: {
+        swSrc: "src/sw.ts",
+        injectionPoint: undefined,
       },
     }),
   ],

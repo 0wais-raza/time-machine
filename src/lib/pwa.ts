@@ -1,5 +1,6 @@
 // Guarded service-worker registration wrapper. Never register an app-shell
 // service worker in dev, inside an iframe, or when explicitly disabled.
+import type { ScheduledEvent } from "./scheduler";
 
 const APP_SW_PATH = "/sw.js";
 
@@ -41,29 +42,115 @@ export async function registerPwa() {
   }
 }
 
-export async function requestNotifyAndShow(title: string, body: string) {
-  if (typeof window === "undefined" || !("Notification" in window)) return false;
+/* ------------------------------ permission ---------------------------- */
+
+export function isNotifySupported(): boolean {
+  return typeof window !== "undefined" && "Notification" in window;
+}
+
+export function getNotifyPermission(): NotificationPermission | "unsupported" {
+  if (!isNotifySupported()) return "unsupported";
+  return Notification.permission;
+}
+
+/** Must be called from a user gesture (button click). */
+export async function requestNotifyPermission(): Promise<NotificationPermission> {
+  if (!isNotifySupported()) return "denied";
   if (Notification.permission === "default") {
-    const res = await Notification.requestPermission();
+    try {
+      return await Notification.requestPermission();
+    } catch {
+      return "denied";
+    }
+  }
+  return Notification.permission;
+}
+
+/* ------------------------------ sending ------------------------------- */
+
+export interface SystemNotificationOptions {
+  tag?: string;
+  renotify?: boolean;
+}
+
+/**
+ * Unified Windows/browser notification sender. Prefers the service worker
+ * (`showNotification`), falls back to `new Notification`. Requests permission
+ * on the fly when the app still has the "default" state.
+ */
+export async function sendSystemNotification(
+  title: string,
+  body: string,
+  opts: SystemNotificationOptions = {},
+): Promise<boolean> {
+  if (!isNotifySupported()) return false;
+  if (Notification.permission === "default") {
+    const res = await requestNotifyPermission();
     if (res !== "granted") return false;
   } else if (Notification.permission !== "granted") {
     return false;
   }
+  const icon = "/icons/icon-192.png";
   try {
     if ("serviceWorker" in navigator) {
       const reg = await navigator.serviceWorker.getRegistration();
       if (reg) {
-        await reg.showNotification(title, {
-          body,
-          icon: "/icons/icon-192.png",
-          badge: "/icons/icon-192.png",
-        });
+        await reg.showNotification(
+          title,
+          // `renotify` is a real Notification API option missing from TS lib.
+          {
+            body,
+            icon,
+            badge: icon,
+            tag: opts.tag,
+            renotify: opts.tag ? opts.renotify ?? true : undefined,
+            data: { url: "/" },
+          } as NotificationOptions,
+        );
         return true;
       }
     }
-    new Notification(title, { body, icon: "/icons/icon-192.png" });
+    new Notification(title, { body, icon, tag: opts.tag, data: { url: "/" } });
     return true;
   } catch {
     return false;
+  }
+}
+
+/** Legacy name kept for call-site compatibility. */
+export function requestNotifyAndShow(
+  title: string,
+  body: string,
+  opts: SystemNotificationOptions = {},
+): Promise<boolean> {
+  return sendSystemNotification(title, body, opts);
+}
+
+/* --------------------- closed-tab schedule arming --------------------- */
+
+/**
+ * Hand the next ~25h of events to the service worker so notifications fire
+ * even when the app/tab is closed (while the browser process is running).
+ * Re-arming replaces the previous schedule (stale events are dropped).
+ */
+export async function armNotificationSchedule(events: ScheduledEvent[]) {
+  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
+  try {
+    const reg = await navigator.serviceWorker.getRegistration();
+    const sw = reg?.active ?? reg?.waiting ?? reg?.installing;
+    sw?.postMessage({ type: "ARM_NOTIFICATIONS", events });
+  } catch {
+    /* ignore */
+  }
+}
+
+export async function clearNotificationSchedule() {
+  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
+  try {
+    const reg = await navigator.serviceWorker.getRegistration();
+    const sw = reg?.active ?? reg?.waiting ?? reg?.installing;
+    sw?.postMessage({ type: "CLEAR_NOTIFICATIONS" });
+  } catch {
+    /* ignore */
   }
 }

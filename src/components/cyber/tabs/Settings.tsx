@@ -13,10 +13,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Bell, KeyRound, ShieldCheck, User, Brain, Download, Trash2, Upload, Cpu } from "lucide-react";
-import { requestNotifyAndShow } from "@/lib/pwa";
+import { Bell, BellRing, KeyRound, ShieldCheck, User, Brain, Download, Trash2, Upload, Cpu } from "lucide-react";
+import {
+  isNotifySupported,
+  getNotifyPermission,
+  requestNotifyPermission,
+  sendSystemNotification,
+} from "@/lib/pwa";
 import { tzName } from "@/lib/clock";
 import { HudLabel } from "../HudLabel";
+import { cn } from "@/lib/utils";
 
 export function SettingsTab() {
   const {
@@ -48,19 +54,39 @@ export function SettingsTab() {
   };
 
   const requestPerm = async () => {
-    if (!("Notification" in window)) {
-      toast.error("Browser does not support notifications.");
+    if (!isNotifySupported()) {
+      toast.error("This browser does not support notifications.");
       return;
     }
-    const res = await Notification.requestPermission();
+    const res = await requestNotifyPermission();
     if (res === "granted") {
       setNotificationsEnabled(true);
-      await requestNotifyAndShow("Vizier online", "Alert broadcast authorized.");
-      toast.success("Notifications authorized.");
+      await sendSystemNotification("J.A.R.V.I.S. online", "Alert broadcast authorized, Sir.", {
+        tag: "cv-perm-test",
+      });
+      toast.success("Notifications authorized — test alert sent.");
     } else {
-      toast.error("Permission denied.");
+      toast.error("Permission denied. Check your browser/Windows notification settings.");
     }
   };
+
+  const sendTest = async () => {
+    const res = await requestNotifyPermission();
+    if (res !== "granted") {
+      toast.error("Notification permission is not granted.");
+      return;
+    }
+    setNotificationsEnabled(true);
+    const ok = await sendSystemNotification(
+      "J.A.R.V.I.S. // Test Signal",
+      "Windows notifications are live, Sir. Alert systems nominal.",
+      { tag: "cv-test" },
+    );
+    if (ok) toast.success("Test notification delivered.");
+    else toast.error("Test failed — the OS suppressed it.");
+  };
+
+  const perm = getNotifyPermission();
 
   const exportData = () => {
     const blob = new Blob(
@@ -142,12 +168,26 @@ export function SettingsTab() {
             <HudLabel accent="violet">Alert Broadcast</HudLabel>
           </div>
           <p className="text-xs text-muted-foreground mb-3">
-            Native browser notifications fire only on critical events:
-            deadlines, milestone thresholds, and schedule changes.
+            Native Windows/browser notifications fire on deadlines, milestone thresholds,
+            schedule blocks and prayer times.
           </p>
           <div className="flex items-center gap-3 mb-3">
             <Switch checked={notificationsEnabled} onCheckedChange={setNotificationsEnabled} />
             <span className="text-sm">{notificationsEnabled ? "Broadcasting" : "Silent"}</span>
+          </div>
+          {/* Live permission status */}
+          <div
+            className={cn(
+              "mb-3 flex items-center gap-2 rounded-md border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.2em]",
+              perm === "granted"
+                ? "border-[oklch(0.8_0.16_155/0.35)] bg-[oklch(0.8_0.16_155/0.08)] text-[var(--holo-green)]"
+                : perm === "default"
+                  ? "border-[oklch(0.85_0.17_200/0.35)] bg-[oklch(0.85_0.17_200/0.08)] text-[var(--holo-cyan)]"
+                  : "border-[oklch(0.72_0.24_350/0.4)] bg-[oklch(0.72_0.24_350/0.08)] text-[var(--holo-pink)]",
+            )}
+          >
+            <span className="led-dot size-1.5" style={{ color: "currentColor" }} />
+            OS Permission: {perm === "granted" ? "GRANTED" : perm === "default" ? "NOT REQUESTED" : "BLOCKED"}
           </div>
           <div className="mb-3">
             <Label className="text-xs uppercase tracking-widest text-muted-foreground">
@@ -168,10 +208,27 @@ export function SettingsTab() {
               </SelectContent>
             </Select>
           </div>
-          <Button onClick={requestPerm} variant="secondary" className="w-full">
-            <ShieldCheck className="size-4 mr-2" />
-            Authorize System Alert Broadcast
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={requestPerm} variant="secondary" className="flex-1">
+              <ShieldCheck className="mr-2 size-4" />
+              {perm === "granted" ? "Re-authorize" : "Authorize"}
+            </Button>
+            <Button
+              onClick={sendTest}
+              variant="secondary"
+              className="flex-1 border-[oklch(0.85_0.17_200/0.3)] text-[var(--holo-cyan)] hover:bg-[oklch(0.85_0.17_200/0.1)]"
+              title="Instantly verify Windows notifications"
+            >
+              <BellRing className="mr-2 size-4" />
+              Test Alert
+            </Button>
+          </div>
+          <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
+            <b className="text-foreground/80">Closed-tab delivery:</b> while the app is open — or closed
+            but the browser keeps running — alerts fire via the service worker. For alerts when the
+            browser itself is fully shut down, install the app and keep the browser open, or use a
+            native wrapper (Web Push needs a push server).
+          </p>
         </div>
 
         <div className="glass-panel relative p-5">

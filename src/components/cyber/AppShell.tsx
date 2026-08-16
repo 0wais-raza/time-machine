@@ -13,7 +13,8 @@ import { SettingsTab } from "./tabs/Settings";
 import { FocusOverlay } from "./FocusOverlay";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
-import { requestNotifyAndShow } from "@/lib/pwa";
+import { requestNotifyAndShow, armNotificationSchedule } from "@/lib/pwa";
+import { buildUpcomingEvents } from "@/lib/scheduler";
 import { to12h } from "@/lib/clock";
 import { fetchPrayerTimes } from "@/lib/prayerTimes";
 
@@ -72,7 +73,8 @@ export function AppShell() {
             : `Daily progress crossed ${m}%. Hold the line.`;
         toast(`Vizier // ${m}%`, { description: msg });
         pushNotification({ kind: "milestone", title: `Vizier // ${m}%`, body: msg });
-        if (notificationsEnabled) requestNotifyAndShow(`Vizier // ${m}%`, msg);
+        if (notificationsEnabled)
+          requestNotifyAndShow(`Vizier // ${m}%`, msg, { tag: `cv-milestone-${today}-${m}` });
         recordMilestone(today, m);
       }
     }
@@ -97,7 +99,10 @@ export function AppShell() {
           markDispatched(key);
           pushNotification({ kind: "deadline", title: `Deadline // ${t.title}`, body: "Execute now." });
           toast(`Deadline reached`, { description: t.title });
-          if (notificationsEnabled) requestNotifyAndShow(`Deadline // ${t.title}`, "Execute now.");
+          if (notificationsEnabled)
+            requestNotifyAndShow(`Deadline // ${t.title}`, "Execute now.", {
+              tag: `cv-deadline-${t.id}`,
+            });
         }
       }
 
@@ -114,18 +119,24 @@ export function AppShell() {
           pushNotification({ kind: "block", title: `Block // ${b.title}`, body: range, refId: b.id });
           if (notificationsEnabled && typeof window !== "undefined" && "Notification" in window) {
             const blockId = b.id;
+            const tag = `cv-block-${b.id}-${today}`;
             const fire = () => {
               try {
-                const n = new Notification(`Block // ${b.title}`, { body: range, icon: "/icons/icon-192.png" });
+                // Same tag as the service worker so closed-tab delivery never doubles up.
+                const n = new Notification(`Block // ${b.title}`, {
+                  body: range,
+                  icon: "/icons/icon-192.png",
+                  tag,
+                });
                 // Dismissing the notification auto-registers this block as done.
                 n.onclose = () => markBlockDone(blockId, today);
                 n.onclick = () => markBlockDone(blockId, today);
               } catch {
-                requestNotifyAndShow(`Block // ${b.title}`, range);
+                requestNotifyAndShow(`Block // ${b.title}`, range, { tag });
               }
             };
             if (Notification.permission === "granted") fire();
-            else requestNotifyAndShow(`Block // ${b.title}`, range);
+            else requestNotifyAndShow(`Block // ${b.title}`, range, { tag });
           }
         }
       }
@@ -147,7 +158,10 @@ export function AppShell() {
             title: `${p.name} approaching`,
             body: `In ${diff} min — ${to12h(tStr)}`,
           });
-          if (notificationsEnabled) requestNotifyAndShow(`${p.name} approaching`, `In ${diff} min`);
+          if (notificationsEnabled)
+            requestNotifyAndShow(`${p.name} approaching`, `In ${diff} min`, {
+              tag: `cv-prayer-${p.name}-${today}`,
+            });
         }
       }
     };
@@ -189,6 +203,23 @@ export function AppShell() {
     const id = setInterval(check, 60 * 1000);
     return () => clearInterval(id);
   }, [tasks, recoveryBriefed, markRecoveryBriefed, pushNotification, pushToActive, notificationsEnabled]);
+
+  // Closed-tab delivery: keep the service worker's schedule in sync with live
+  // state, and re-arm the instant the app leaves the screen (close / hide).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!notificationsEnabled) return;
+    armNotificationSchedule(buildUpcomingEvents());
+    const onHidden = () => {
+      if (document.hidden) armNotificationSchedule(buildUpcomingEvents());
+    };
+    document.addEventListener("visibilitychange", onHidden);
+    window.addEventListener("pagehide", onHidden);
+    return () => {
+      document.removeEventListener("visibilitychange", onHidden);
+      window.removeEventListener("pagehide", onHidden);
+    };
+  }, [notificationsEnabled, tasks, blocks, prayers, prayerTimes]);
 
   return (
     <div className="flex h-screen w-screen overflow-hidden">
