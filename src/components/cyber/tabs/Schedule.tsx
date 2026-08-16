@@ -6,7 +6,7 @@ export function ScheduleTab() {
     <div className="flex h-full min-h-0 flex-col gap-4">
       <div className="shrink-0">
         <PanelHeader
-          eyebrow="Tab 04 / Chronos"
+          eyebrow="J.A.R.V.I.S. // Chronos"
           title="Weekly Time Matrix"
           subtitle="Drag to shift, resize to stretch, tick a block to bank 3 credits."
         />

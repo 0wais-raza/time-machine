@@ -144,7 +144,7 @@ export function NamazTab() {
       />
 
       {/* Hero — Hijri clock + live countdown + cycle ring */}
-      <div className="glass-panel cyber-grid relative mb-4 overflow-hidden p-5">
+      <div className="glass-panel cyber-grid corner-brackets relative mb-4 overflow-hidden p-5">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[oklch(0.85_0.17_200/0.5)] to-transparent" />
         <div className="relative grid gap-5 md:grid-cols-3">
           {/* Hijri */}

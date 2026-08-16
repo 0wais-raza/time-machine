@@ -202,7 +202,15 @@ export function AnalyticsTab() {
     setBusy(true);
     setSummary("");
     try {
-      const ctx = buildContext({ tasks, blocks, prayers, mode: "analytics-summary" });
+      const ctx = buildContext({
+        tasks,
+        blocks,
+        prayers,
+        credits,
+        creditHistory,
+        completedBlocks,
+        mode: "analytics-summary",
+      });
       const session = sessions.find((s) => s.id === activeSessionId) ?? sessions[0];
       const recent = session?.messages.slice(-3) ?? [];
       const reply = await callVizier(
@@ -233,7 +241,7 @@ export function AnalyticsTab() {
   return (
     <div>
       <PanelHeader
-        eyebrow="Signals / Telemetry"
+        eyebrow="J.A.R.V.I.S. // Telemetry"
         title="Analytics Arcade"
         subtitle="Performance, consistency and credit flow — decoded."
       />

@@ -1,13 +1,14 @@
 import { useEffect, useRef } from "react";
 import { useApp, todayStr, PRAYERS } from "@/lib/store";
 import { HolographicNavBar } from "./HolographicNavBar";
-import { VizierDrawer } from "./VizierDrawer";
+import { JarvisOrb } from "./JarvisOrb";
 import { DashboardTab } from "./tabs/Dashboard";
 import { NamazTab } from "./tabs/Namaz";
 import { TodoTab } from "./tabs/Todo";
 import { ScheduleTab } from "./tabs/Schedule";
 import { AnalyticsTab } from "./tabs/Analytics";
 import { WorkbenchTab } from "./tabs/Workbench";
+import { VizierTab } from "./tabs/Vizier";
 import { SettingsTab } from "./tabs/Settings";
 import { FocusOverlay } from "./FocusOverlay";
 import { Toaster } from "@/components/ui/sonner";
@@ -189,15 +190,9 @@ export function AppShell() {
     return () => clearInterval(id);
   }, [tasks, recoveryBriefed, markRecoveryBriefed, pushNotification, pushToActive, notificationsEnabled]);
 
-  const vizierCollapsed = useApp((s) => s.vizierCollapsed);
-  const railWidth = vizierCollapsed ? 56 : 380;
-
   return (
     <div className="flex h-screen w-screen overflow-hidden">
-      <div
-        className="flex min-w-0 flex-1 flex-col transition-[margin] duration-300"
-        style={{ marginRight: railWidth }}
-      >
+      <div className="flex min-w-0 flex-1 flex-col">
         <HolographicNavBar />
         <main className="scroll-y-clean flex-1 min-h-0 px-6 py-6">
           {activeTab === "dashboard" && <DashboardTab />}
@@ -206,10 +201,11 @@ export function AppShell() {
           {activeTab === "schedule" && <ScheduleTab />}
           {activeTab === "analytics" && <AnalyticsTab />}
           {activeTab === "workbench" && <WorkbenchTab />}
+          {activeTab === "vizier" && <VizierTab />}
           {activeTab === "settings" && <SettingsTab />}
         </main>
       </div>
-      <VizierDrawer />
+      <JarvisOrb />
       <Toaster theme="dark" />
       <FocusOverlay />
     </div>

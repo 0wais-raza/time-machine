@@ -400,7 +400,7 @@ export function WorkbenchTab() {
   return (
     <div>
       <PanelHeader
-        eyebrow="Armory // Assembly"
+        eyebrow="J.A.R.V.I.S. // Armory"
         title="RIG ARMORY & STORE"
         subtitle="Purchase hardware into your armory, then equip parts to light them up inside the live 3D rig."
         right={

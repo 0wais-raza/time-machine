@@ -89,6 +89,7 @@ export type TabKey =
   | "schedule"
   | "analytics"
   | "workbench"
+  | "vizier"
   | "settings";
 
 export interface UserProfile {
@@ -225,12 +226,6 @@ interface AppState {
 
   notificationsEnabled: boolean;
   setNotificationsEnabled: (b: boolean) => void;
-
-  vizierOpen: boolean;
-  setVizierOpen: (b: boolean) => void;
-
-  vizierCollapsed: boolean;
-  setVizierCollapsed: (b: boolean) => void;
 }
 
 /** Credits awarded when a mission is completed, by priority. */
@@ -742,12 +737,6 @@ export const useApp = create<AppState>()(
 
       notificationsEnabled: false,
       setNotificationsEnabled: (b) => set({ notificationsEnabled: b }),
-
-      vizierOpen: false,
-      setVizierOpen: (b) => set({ vizierOpen: b }),
-
-      vizierCollapsed: false,
-      setVizierCollapsed: (b: boolean) => set({ vizierCollapsed: b }),
     }),
     {
       name: "cybertime-machine-v1",

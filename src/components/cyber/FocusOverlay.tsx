@@ -55,16 +55,55 @@ export function FocusOverlay() {
           {task.estimatedMinutes ? ` • Target: ${task.estimatedMinutes}m` : " • No estimate (25m sprint)"}
         </div>
 
-        <div className="my-8 text-center">
+        <div className="relative mx-auto my-8 flex items-center justify-center">
+          {/* JARVIS arc rings around the countdown */}
+          <svg width="280" height="280" viewBox="0 0 280 280" className="absolute inset-0">
+            <defs>
+              <linearGradient id="focusSweep" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stopColor="var(--holo-cyan)" />
+                <stop offset="100%" stopColor="var(--holo-violet)" />
+              </linearGradient>
+              <filter id="focusGlow" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur stdDeviation="2" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
+            <circle cx="140" cy="140" r="126" fill="none" stroke="oklch(1 1 1 / 0.06)" strokeWidth="2" />
+            <circle
+              cx="140"
+              cy="140"
+              r="126"
+              fill="none"
+              stroke="url(#focusSweep)"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeDasharray={2 * Math.PI * 126}
+              strokeDashoffset={2 * Math.PI * 126 * (1 - (elapsedMs % 60000) / 60000)}
+              transform="rotate(-90 140 140)"
+              filter="url(#focusGlow)"
+              style={{ transition: "stroke-dashoffset 0.9s linear" }}
+            />
+          </svg>
           <div
-            className={`font-mono text-7xl font-black tabular-nums ${
-              overrun ? "text-[var(--holo-pink)]" : "neon-text"
-            }`}
-          >
-            {pad(hh)}:{pad(mm)}:{pad(ss)}
-          </div>
-          <div className="mt-2 text-[10px] uppercase tracking-[0.4em] text-muted-foreground">
-            {overrun ? "Overrun" : "Remaining"}
+            className="pointer-events-none absolute inset-8 animate-[holo-spin_9s_linear_infinite] rounded-full border border-dashed border-[oklch(0.85_0.17_200/0.25)]"
+          />
+          <div
+            className={`pointer-events-none absolute inset-16 animate-[holo-spin-rev_6s_linear_infinite] rounded-full border border-dashed border-[oklch(0.66_0.27_295/0.3)]`}
+          />
+          <div className="relative text-center">
+            <div
+              className={`font-mono text-6xl font-black tabular-nums ${
+                overrun ? "text-[var(--holo-pink)]" : "neon-text"
+              }`}
+            >
+              {pad(hh)}:{pad(mm)}:{pad(ss)}
+            </div>
+            <div className="mt-2 text-[10px] uppercase tracking-[0.4em] text-muted-foreground">
+              {overrun ? "Overrun" : "Remaining"}
+            </div>
           </div>
         </div>
 

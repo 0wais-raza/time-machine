@@ -8,6 +8,7 @@ import {
   Settings,
   Coins,
   Flame,
+  Bot,
   type LucideIcon,
 } from "lucide-react";
 import { useApp, PRAYERS, todayStr, type TabKey } from "@/lib/store";
@@ -22,6 +23,7 @@ const NAV_ITEMS: { key: TabKey; label: string; icon: LucideIcon }[] = [
   { key: "schedule", label: "Time Fortress", icon: CalendarClock },
   { key: "analytics", label: "Analytics Arcade", icon: BarChart3 },
   { key: "workbench", label: "Rig Armory", icon: Cpu },
+  { key: "vizier", label: "J.A.R.V.I.S.", icon: Bot },
   { key: "settings", label: "System Core", icon: Settings },
 ];
 
@@ -63,12 +65,13 @@ export function HolographicNavBar() {
             <span className="relative text-[10px] font-bold text-[var(--holo-cyan)]">CV</span>
           </div>
           <div className="hidden leading-none sm:block">
-            <div className="text-[11px] font-bold tracking-[0.22em] text-foreground">CHRONOS VIZIER</div>
+            <div className="text-[11px] font-bold tracking-[0.22em] text-foreground">J.A.R.V.I.S.</div>
+            <div className="font-mono text-[8px] uppercase tracking-[0.3em] text-[var(--holo-cyan)]/70">Chronos Vizier</div>
           </div>
         </div>
 
         {/* Centered circular tabs */}
-        <nav className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 sm:gap-1.5">
+        <nav className="no-scrollbar absolute left-1/2 top-1/2 flex max-w-[62vw] -translate-x-1/2 -translate-y-1/2 items-center gap-1 overflow-x-auto px-2 sm:gap-1.5">
           {NAV_ITEMS.map((it) => {
             const Icon = it.icon;
             const active = activeTab === it.key;
@@ -80,7 +83,7 @@ export function HolographicNavBar() {
                 aria-current={active ? "page" : undefined}
                 onClick={() => setActiveTab(it.key)}
                 className={cn(
-                  "relative flex size-9 items-center justify-center rounded-full border transition-all duration-200 md:size-10",
+                  "relative flex size-8 items-center justify-center rounded-full border transition-all duration-200 md:size-9 xl:size-10",
                   active
                     ? "border-[var(--holo-cyan)] bg-[oklch(0.85_0.17_200/0.1)] text-[var(--holo-cyan)] shadow-[0_0_18px_oklch(0.85_0.17_200/0.35),inset_0_0_12px_oklch(0.85_0.17_200/0.12)]"
                     : "border-transparent text-muted-foreground hover:bg-[oklch(1_1_1/0.05)] hover:text-foreground",
