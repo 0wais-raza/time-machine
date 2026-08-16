@@ -46,7 +46,7 @@ export function FocusOverlay() {
         >
           <X className="size-5" />
         </button>
-        <div className="text-[10px] uppercase tracking-[0.4em] text-[var(--neon-cyan)]">
+        <div className="text-[10px] uppercase tracking-[0.4em] text-[var(--holo-cyan)]">
           Deep Focus // Mission Engaged
         </div>
         <h2 className="mt-2 text-2xl font-black tracking-tight">{task.title}</h2>
@@ -58,7 +58,7 @@ export function FocusOverlay() {
         <div className="my-8 text-center">
           <div
             className={`font-mono text-7xl font-black tabular-nums ${
-              overrun ? "text-[var(--neon-pink)]" : "neon-text"
+              overrun ? "text-[var(--holo-pink)]" : "neon-text"
             }`}
           >
             {pad(hh)}:{pad(mm)}:{pad(ss)}
@@ -81,7 +81,7 @@ export function FocusOverlay() {
         </div>
 
         <div className="mt-4 flex items-center justify-center gap-1 text-[10px] uppercase tracking-widest text-muted-foreground">
-          <Zap className="size-3 text-[var(--neon-cyan)]" />
+          <Zap className="size-3 text-[var(--holo-cyan)]" />
           Efficiency logs to XP on completion
         </div>
       </div>

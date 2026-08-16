@@ -1,21 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Bot,
-  Send,
   Sparkles,
   Plus,
   Trash2,
   MessageSquare,
-  Zap,
   History,
   ChevronsRight,
-  ChevronsLeft,
   AlertTriangle,
   Paperclip,
   X,
 } from "lucide-react";
 import { useApp, newId, todayStr, type PrayerName, type TabKey } from "@/lib/store";
-import { buildContext, callGemini, type VizierAction, type VizierAttachment } from "@/lib/gemini";
+import { buildContext, callVizier, type VizierAction, type VizierAttachment } from "@/lib/ai-core";
 import { tryHandleSlash } from "@/lib/slashCommands";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,11 +20,31 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { formatTime12, to12h, tzName } from "@/lib/clock";
 
+/** JARVIS-style arc reactor HUD (pure CSS spinning rings — zero GPU cost). */
+function ArcReactor({ size = 48 }: { size?: number }) {
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }} aria-hidden>
+      <div
+        className="absolute inset-0 animate-[holo-spin_6s_linear_infinite] rounded-full border-2 border-[oklch(0.85_0.17_200/0.3)]"
+        style={{ borderTopColor: "var(--holo-cyan)", borderRightColor: "transparent" }}
+      />
+      <div
+        className="absolute inset-[14%] animate-[holo-spin-rev_4.2s_linear_infinite] rounded-full border border-[oklch(0.66_0.27_295/0.45)]"
+        style={{ borderBottomColor: "var(--holo-violet)", borderTopColor: "transparent" }}
+      />
+      <div
+        className="absolute inset-[30%] animate-[holo-spin_3s_linear_infinite] rounded-full border border-[oklch(0.82_0.16_80/0.45)]"
+        style={{ borderLeftColor: "var(--holo-amber)", borderRightColor: "transparent" }}
+      />
+      <div className="absolute inset-[42%] animate-[reactor-core_2.2s_ease-in-out_infinite] rounded-full bg-[var(--holo-cyan)] shadow-[0_0_14px_var(--holo-cyan)]" />
+    </div>
+  );
+}
+
 export function VizierDrawer() {
   const {
     vizierCollapsed,
     setVizierCollapsed,
-    geminiKey,
     tasks,
     blocks,
     prayers,
@@ -49,9 +66,11 @@ export function VizierDrawer() {
     memory,
     addMemoryNote,
     settings,
+    credits,
     bootGreetedSession,
     markBootGreeted,
   } = useApp();
+  const openrouterKey = useApp((s) => s.openrouterKey);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -336,7 +355,7 @@ export function VizierDrawer() {
         live.sessions.find((s) => s.id === live.activeSessionId) ??
         live.sessions[0];
       const history = session?.messages ?? [];
-      const reply = await callGemini(geminiKey, history, ctx, settings.aiModel, {
+      const reply = await callVizier(history, ctx, settings.aiModel, {
         maxTokens: settings.aiDepth === "deep" ? 1400 : 700,
         temperature: settings.aiDepth === "deep" ? 0.7 : 0.55,
         attachments: sentAttachments.length ? sentAttachments : undefined,
@@ -393,31 +412,51 @@ export function VizierDrawer() {
     await sendText(summary);
   };
 
+  // Quick Directive Chips — one-tap directives into the Vizier channel.
+  const quickDirectives: { label: string; run: () => void }[] = [
+    { label: "Analyze System Status", run: quickContext },
+    {
+      label: "Equip Best Available GPU",
+      run: () =>
+        sendText(
+          "Recommend the best GPU in the Armory I can afford with my current credits and tell me how equipping it changes my rig.",
+        ),
+    },
+    { label: "Add Study Block at 4 PM", run: () => sendText("/add Study block at 4 PM-6 PM") },
+    {
+      label: "Clear Overdue Backlog",
+      run: () =>
+        sendText(
+          `Clear my overdue backlog. Reschedule or close these: ${overdue
+            .map((t) => t.title)
+            .join(", ")}. Use add_block / complete_task actions.`,
+        ),
+    },
+    {
+      label: "Optimize Today's Schedule",
+      run: () =>
+        sendText(
+          "Optimize my schedule for the rest of today. Suggest add_block actions to recover lost time.",
+        ),
+    },
+  ];
+
   if (vizierCollapsed) {
     return (
-      <aside className="fixed right-0 top-0 z-30 flex h-full w-14 flex-col items-center gap-3 border-l border-border bg-[oklch(0.11_0.02_270)]/95 py-3 backdrop-blur-xl">
+      <aside className="fixed right-0 top-0 z-30 flex h-full w-14 flex-col items-center gap-3 border-l border-[oklch(0.85_0.17_200/0.2)] bg-[oklch(0.085_0.02_270/0.94)] py-3 backdrop-blur-xl">
         <button
           onClick={() => setVizierCollapsed(false)}
-          className="flex size-10 items-center justify-center rounded-md bg-[image:var(--gradient-cyber)] text-background neon-glow"
+          className="relative flex size-10 items-center justify-center rounded-full border border-[oklch(0.85_0.17_200/0.4)] bg-[oklch(0.85_0.17_200/0.1)] text-[var(--holo-cyan)]"
           title="Expand Vizier"
         >
+          <span className="pointer-events-none absolute -inset-[3px] animate-[holo-spin_4s_linear_infinite] rounded-full border border-dashed border-[oklch(0.85_0.17_200/0.5)]" />
           <Bot className="size-5" />
         </button>
-        <button
-          onClick={() => setVizierCollapsed(false)}
-          className="text-muted-foreground hover:text-foreground"
-          title="Expand"
-        >
-          <ChevronsLeft className="size-4" />
-        </button>
         {overdue.length > 0 && (
-          <div className="mt-1 rounded-full bg-[var(--neon-pink)]/20 px-1.5 py-0.5 text-[10px] font-mono text-[var(--neon-pink)]">
+          <div className="mt-1 rounded-full bg-[var(--holo-pink)]/20 px-1.5 py-0.5 text-[10px] font-mono text-[var(--holo-pink)]">
             !{overdue.length}
           </div>
         )}
-        <div className="mt-auto rotate-180 [writing-mode:vertical-rl] text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
-          Vizier
-        </div>
       </aside>
     );
   }
@@ -428,50 +467,75 @@ export function VizierDrawer() {
 
   return (
     <>
-      <aside className="fixed right-0 top-0 z-30 flex h-full w-[380px] flex-col border-l border-border bg-[oklch(0.11_0.02_270)]/95 backdrop-blur-xl">
-        <div className="flex items-center justify-between border-b border-border px-5 py-4">
-          <div className="flex items-center gap-3">
-            <div className="size-9 rounded-md bg-[image:var(--gradient-cyber)] flex items-center justify-center neon-glow">
-              <Bot className="size-5 text-background" />
-            </div>
-            <div>
-              <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                AI Chief of Staff
+      <aside className="fixed right-0 top-0 z-30 flex h-full w-[380px] flex-col border-l border-[oklch(0.85_0.17_200/0.22)] bg-[oklch(0.085_0.02_270/0.94)] backdrop-blur-xl">
+        {/* Tactical AI Core header */}
+        <div className="relative border-b border-[oklch(0.85_0.17_200/0.15)] px-5 pb-3 pt-4">
+          <div className="relative flex items-center gap-3">
+            <ArcReactor />
+            <div className="min-w-0 flex-1">
+              <div className="font-mono text-[9px] uppercase tracking-[0.3em] text-[var(--holo-cyan)]">
+                AI Chief of Staff // Core Online
               </div>
-              <div className="font-bold tracking-wide neon-text truncate max-w-[180px]">
+              <div className="truncate text-base font-bold tracking-wide text-foreground">
                 {active?.title ?? "THE VIZIER"}
               </div>
             </div>
+            <div className="flex items-center gap-1">
+              <Button
+                size="icon"
+                variant="ghost"
+                title="History"
+                onClick={() => setHistoryOpen((v) => !v)}
+                className={cn(historyOpen && "text-[var(--holo-cyan)]")}
+              >
+                <History className="size-4" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                title="New chat"
+                onClick={() => {
+                  newSession();
+                  setHistoryOpen(false);
+                }}
+              >
+                <Plus className="size-4" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                title="Collapse"
+                onClick={() => setVizierCollapsed(true)}
+              >
+                <ChevronsRight className="size-4" />
+              </Button>
+            </div>
           </div>
-          <div className="flex items-center gap-1">
-            <Button
-              size="icon"
-              variant="ghost"
-              title="History"
-              onClick={() => setHistoryOpen((v) => !v)}
-              className={cn(historyOpen && "text-[var(--neon-cyan)]")}
+          {/* Glowing banner */}
+          <div className="relative mt-3 flex items-center gap-2 rounded-sm border border-[oklch(0.8_0.16_155/0.35)] bg-[oklch(0.8_0.16_155/0.07)] px-2.5 py-1.5">
+            <span className="led-dot" style={{ color: "var(--holo-green)" }} />
+            <span className="font-mono text-[9px] font-bold uppercase tracking-[0.3em] text-[var(--holo-green)]">
+              Tactical Advisor Online
+            </span>
+            <span
+              className="ml-auto font-mono text-[9px] text-muted-foreground"
+              suppressHydrationWarning
             >
-              <History className="size-4" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              title="New chat"
-              onClick={() => {
-                newSession();
-                setHistoryOpen(false);
-              }}
-            >
-              <Plus className="size-4" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              title="Collapse"
-              onClick={() => setVizierCollapsed(true)}
-            >
-              <ChevronsRight className="size-4" />
-            </Button>
+              {mounted ? formatTime12(new Date()) : ""}
+            </span>
+          </div>
+          {/* Dynamic telemetry readouts */}
+          <div className="relative mt-2 flex flex-wrap gap-x-4 gap-y-1 font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
+            <span>
+              Missions open <b className="text-[var(--holo-cyan)]">{tasks.filter((t) => !t.done).length}</b>
+            </span>
+            <span>
+              Credits <b className="text-[var(--holo-amber)]">{credits}</b>
+            </span>
+            <span>
+              Channel <b className="text-[var(--holo-violet)]">{chat.length}</b>
+            </span>
+            <span className="ml-auto text-[var(--holo-green)]">Core ▮▮▮▯</span>
           </div>
         </div>
 
@@ -489,8 +553,8 @@ export function VizierDrawer() {
                     className={cn(
                       "group mx-2 mb-1 flex items-center gap-2 rounded-md border px-2 py-2 text-sm cursor-pointer transition",
                       isActive
-                        ? "border-[var(--neon-cyan)]/40 bg-[oklch(0.85_0.2_200_/_0.1)]"
-                        : "border-border hover:border-[var(--neon-violet)]/40",
+                        ? "border-[var(--holo-cyan)]/40 bg-[oklch(0.85_0.2_200_/_0.1)]"
+                        : "border-border hover:border-[var(--holo-violet)]/40",
                     )}
                     onClick={() => {
                       selectSession(s.id);
@@ -513,7 +577,7 @@ export function VizierDrawer() {
                         }
                         deleteSession(s.id);
                       }}
-                      className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-[var(--neon-pink)] transition"
+                      className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-[var(--holo-pink)] transition"
                       title="Delete"
                     >
                       <Trash2 className="size-3.5" />
@@ -527,8 +591,8 @@ export function VizierDrawer() {
 
         <div ref={scrollRef} className="scroll-y-clean flex-1 min-h-0 px-5 py-4 space-y-4">
           {mounted && overdue.length > 0 && (
-            <div className="rounded-md border border-[var(--neon-pink)]/40 bg-[var(--neon-pink)]/5 p-3 text-xs">
-              <div className="mb-2 flex items-center gap-1.5 text-[var(--neon-pink)] font-semibold">
+            <div className="rounded-md border border-[var(--holo-pink)]/40 bg-[var(--holo-pink)]/5 p-3 text-xs">
+              <div className="mb-2 flex items-center gap-1.5 text-[var(--holo-pink)] font-semibold">
                 <AlertTriangle className="size-3.5" />
                 {overdue.length} overdue {overdue.length === 1 ? "task" : "tasks"} detected
               </div>
@@ -539,13 +603,13 @@ export function VizierDrawer() {
                       `Clear my overdue backlog. Reschedule or close these: ${overdue.map((t) => t.title).join(", ")}. Use add_block / complete_task actions.`,
                     )
                   }
-                  className="rounded border border-border bg-background/60 px-2 py-1 text-[11px] hover:border-[var(--neon-cyan)]/50 transition"
+                  className="rounded border border-border bg-background/60 px-2 py-1 text-[11px] hover:border-[var(--holo-cyan)]/50 transition"
                 >
                   Clear Backlog
                 </button>
                 <button
                   onClick={() => quickPrompt("Optimize my schedule for the rest of today. Suggest add_block actions to recover lost time.")}
-                  className="rounded border border-border bg-background/60 px-2 py-1 text-[11px] hover:border-[var(--neon-cyan)]/50 transition"
+                  className="rounded border border-border bg-background/60 px-2 py-1 text-[11px] hover:border-[var(--holo-cyan)]/50 transition"
                 >
                   Optimize Schedule
                 </button>
@@ -555,7 +619,7 @@ export function VizierDrawer() {
                       `Reschedule each of these overdue tasks to a sensible block today or tomorrow: ${overdue.map((t) => t.title).join(", ")}.`,
                     )
                   }
-                  className="rounded border border-border bg-background/60 px-2 py-1 text-[11px] hover:border-[var(--neon-cyan)]/50 transition"
+                  className="rounded border border-border bg-background/60 px-2 py-1 text-[11px] hover:border-[var(--holo-cyan)]/50 transition"
                 >
                   Reschedule Overdue
                 </button>
@@ -569,46 +633,68 @@ export function VizierDrawer() {
             >
               <div
                 className={cn(
-                  "max-w-[85%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap leading-relaxed",
+                  "holo-panel max-w-[88%] px-3 py-2 text-sm whitespace-pre-wrap leading-relaxed",
                   m.role === "user"
-                    ? "bg-[oklch(0.85_0.2_200_/_0.15)] border border-[oklch(0.85_0.2_200_/_0.3)]"
-                    : "bg-secondary/60 border border-border",
+                    ? "border-[oklch(0.66_0.27_295/0.45)] bg-[oklch(0.66_0.27_295/0.08)]"
+                    : "border-[oklch(0.85_0.17_200/0.28)]",
                 )}
               >
-                {m.role === "assistant" && (
-                  <div className="mb-1 flex items-center gap-1 text-[10px] uppercase tracking-widest text-[var(--neon-violet)]">
-                    <Sparkles className="size-3" /> Vizier
-                  </div>
-                )}
+                <div className="mb-1 flex items-center gap-1.5 text-[9px] uppercase tracking-[0.25em]">
+                  {m.role === "assistant" ? (
+                    <>
+                      <Sparkles className="size-3 text-[var(--holo-cyan)]" />
+                      <span className="text-[var(--holo-cyan)]">Vizier</span>
+                    </>
+                  ) : (
+                    <span className="text-[var(--holo-violet)]">You</span>
+                  )}
+                  <span
+                    className="ml-auto font-mono text-[8.5px] tracking-normal text-[oklch(0.85_0.17_200/0.55)]"
+                    suppressHydrationWarning
+                  >
+                    {new Date(m.createdAt).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                </div>
                 {m.content}
               </div>
             </div>
           ))}
           {busy && (
-            <div className="text-xs text-muted-foreground font-mono animate-pulse">
-              Vizier is computing…
+            <div className="flex items-center gap-2.5 font-mono text-[10px] uppercase tracking-[0.25em] text-[var(--holo-cyan)]">
+              <span className="flex gap-1">
+                <span className="size-1.5 animate-[holo-pulse_1s_ease-in-out_infinite] rounded-full bg-[var(--holo-cyan)]" />
+                <span className="size-1.5 animate-[holo-pulse_1s_ease-in-out_infinite] rounded-full bg-[var(--holo-cyan)]" style={{ animationDelay: "0.2s" }} />
+                <span className="size-1.5 animate-[holo-pulse_1s_ease-in-out_infinite] rounded-full bg-[var(--holo-cyan)]" style={{ animationDelay: "0.4s" }} />
+              </span>
+              Vizier processing
             </div>
           )}
           <div ref={bottomRef} />
         </div>
 
-        <div className="border-t border-border p-3">
-          {!geminiKey && (
-            <div className="mb-2 rounded border border-[oklch(0.72_0.28_350_/_0.4)] bg-[oklch(0.72_0.28_350_/_0.1)] px-2 py-1 text-[11px] text-[var(--neon-pink)]">
-              No OpenRouter key set. Configure in System Core.
+        <div className="border-t border-[oklch(0.85_0.17_200/0.15)] bg-black/30 p-3">
+          {!openrouterKey && !(import.meta.env.VITE_OPENROUTER_API_KEY) && (
+            <div className="mb-2 rounded border border-[oklch(0.72_0.28_350_/_0.4)] bg-[oklch(0.72_0.28_350_/_0.1)] px-2 py-1 text-[11px] text-[var(--holo-pink)]">
+              No OpenRouter key set — add one in System Core. It stays in your browser.
             </div>
           )}
+          {/* Quick Directive Chips */}
+          <div className="mb-2 flex flex-wrap gap-1.5">
+            {quickDirectives.map((c) => (
+              <button
+                key={c.label}
+                disabled={busy}
+                onClick={c.run}
+                className="clip-angular border border-[oklch(0.85_0.17_200/0.25)] bg-[oklch(0.85_0.17_200/0.06)] px-2 py-1 text-[10px] font-medium text-[var(--holo-cyan)] transition hover:bg-[oklch(0.85_0.17_200/0.15)] disabled:opacity-50"
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
           <div className="mb-2 flex items-center gap-2">
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={quickContext}
-              disabled={busy}
-              className="flex-1 text-xs"
-            >
-              <Zap className="size-3.5 mr-1.5 text-[var(--neon-cyan)]" />
-              Quick Context
-            </Button>
             <input
               ref={fileRef}
               type="file"
@@ -626,9 +712,15 @@ export function VizierDrawer() {
               onClick={() => fileRef.current?.click()}
               disabled={busy}
               title="Attach image"
+              className="border-[oklch(0.85_0.17_200/0.2)] bg-[oklch(0.85_0.17_200/0.05)]"
             >
-              <Paperclip className="size-3.5" />
+              <Paperclip className="size-3.5 text-[var(--holo-cyan)]" />
             </Button>
+            {attachments.length > 0 && (
+              <span className="font-mono text-[10px] uppercase tracking-wider text-[var(--holo-cyan)]">
+                +{attachments.length} image{attachments.length > 1 ? "s" : ""}
+              </span>
+            )}
           </div>
           {attachments.length > 0 && (
             <div className="mb-2 flex flex-wrap gap-1.5">
@@ -640,7 +732,7 @@ export function VizierDrawer() {
                   <img src={a.dataUrl} alt="" className="h-full w-full object-cover" />
                   <button
                     onClick={() => setAttachments((s) => s.filter((_, j) => j !== i))}
-                    className="absolute top-0 right-0 rounded-bl bg-background/80 p-0.5 text-[var(--neon-pink)]"
+                    className="absolute top-0 right-0 rounded-bl bg-background/80 p-0.5 text-[var(--holo-pink)]"
                   >
                     <X className="size-2.5" />
                   </button>
@@ -659,12 +751,19 @@ export function VizierDrawer() {
                   send();
                 }
               }}
-              placeholder="Issue a directive… e.g. Add study block at 4 PM"
-              className="resize-none bg-background/60"
+              placeholder="Issue Directive to Vizier…"
+              className="resize-none border-[oklch(0.85_0.17_200/0.25)] bg-black/40 focus:border-[var(--holo-cyan)]"
             />
-            <Button onClick={send} disabled={busy} className="self-end">
-              <Send className="size-4" />
+            <Button
+              onClick={send}
+              disabled={busy}
+              className="clip-angular shrink-0 self-end bg-[oklch(0.85_0.17_200/0.9)] font-bold tracking-wider text-black hover:bg-[var(--holo-cyan)]"
+            >
+              EXECUTE <span className="font-mono">[⏎]</span>
             </Button>
+          </div>
+          <div className="mt-1.5 font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground/60">
+            ⏎ send · shift+⏎ newline
           </div>
         </div>
       </aside>

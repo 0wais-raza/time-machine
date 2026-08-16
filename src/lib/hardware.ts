@@ -24,7 +24,56 @@ export interface HardwarePart {
   value: number;
   /** Key live specs shown in the rig view. */
   specs: Record<string, string>;
+  /** Real product photo served from Wikimedia Commons CDN. */
+  image?: string;
 }
+
+/** Stable Wikimedia Commons thumb URLs (resolved via the MediaWiki API). */
+const WIKI = "https://upload.wikimedia.org/wikipedia/commons/thumb";
+
+export const PART_IMAGES: Partial<Record<PartSlot, string>> = {
+  cpu: `${WIKI}/c/c7/AMD_Ryzen_7_5800X_19339.jpg/500px-AMD_Ryzen_7_5800X_19339.jpg`,
+  gpu: `${WIKI}/7/76/Asus_Strix_RTX_4090.jpg/500px-Asus_Strix_RTX_4090.jpg`,
+  ram: `${WIKI}/d/d1/Tridentz_red_RAM.JPG/500px-Tridentz_red_RAM.JPG`,
+  storage: `${WIKI}/9/99/Samsung_MZ-V9P4T0_%28Samsung_990_PRO_4TB%29_20250226_001.png/500px-Samsung_MZ-V9P4T0_%28Samsung_990_PRO_4TB%29_20250226_001.png`,
+  psu: `${WIKI}/e/e5/Full_modular_ATX_power_supply_unit.jpg/500px-Full_modular_ATX_power_supply_unit.jpg`,
+  cooling: `${WIKI}/9/98/RGB_computer_cooling_system_with_LED_lighting.jpg/500px-RGB_computer_cooling_system_with_LED_lighting.jpg`,
+  case: `${WIKI}/3/3e/Computer_case_-_Full_Tower.jpg/500px-Computer_case_-_Full_Tower.jpg`,
+  lighting: `${WIKI}/0/06/RGB_LED_Strip.jpg/500px-RGB_LED_Strip.jpg`,
+  audio: `${WIKI}/d/d3/Sennheiser_RS_175_wireless_headphone_%2B_station_2%2C44_ghz.jpg/500px-Sennheiser_RS_175_wireless_headphone_%2B_station_2%2C44_ghz.jpg`,
+  display: `${WIKI}/f/f5/Computer_monitor_remix_transparent.png/500px-Computer_monitor_remix_transparent.png`,
+  peripheral: `${WIKI}/5/5a/Mechanical_Keyboard.jpg/500px-Mechanical_Keyboard.jpg`,
+};
+
+/** Per-product hero shots (fall back to PART_IMAGES by slot). */
+const IMG: Partial<Record<string, string>> = {
+  "cpu-i9": `${WIKI}/0/0a/Intel_i9-14900KF_CPU.jpg/500px-Intel_i9-14900KF_CPU.jpg`,
+  "gpu-5090": `${WIKI}/7/76/Asus_Strix_RTX_4090.jpg/500px-Asus_Strix_RTX_4090.jpg`,
+  "gpu-4080": `${WIKI}/b/b9/MSI_GeForce_RTX_3070_VENTUS_3X_OC.jpg/500px-MSI_GeForce_RTX_3070_VENTUS_3X_OC.jpg`,
+  "gpu-4060": `${WIKI}/b/b9/MSI_GeForce_RTX_3070_VENTUS_3X_OC.jpg/500px-MSI_GeForce_RTX_3070_VENTUS_3X_OC.jpg`,
+  "gpu-7900": `${WIKI}/f/fc/Amd-radeon-rx6800xt-from2020year-back.jpg/500px-Amd-radeon-rx6800xt-from2020year-back.jpg`,
+  "ssd-4tb": `${WIKI}/4/40/20260522_%EC%8A%A4%EC%BA%94%EB%94%94%EC%8A%A4%ED%81%AC_NVMe_M.2%ED%98%95_SSD.jpg/500px-20260522_%EC%8A%A4%EC%BA%94%EB%94%94%EC%8A%A4%ED%81%AC_NVMe_M.2%ED%98%95_SSD.jpg`,
+  "hdd-8tb": `${WIKI}/3/38/Seagate_ST33232A_hard_disk_inner_view.jpg/500px-Seagate_ST33232A_hard_disk_inner_view.jpg`,
+  "cool-360": `${WIKI}/9/98/RGB_computer_cooling_system_with_LED_lighting.jpg/500px-RGB_computer_cooling_system_with_LED_lighting.jpg`,
+  "cool-custom": `https://upload.wikimedia.org/wikipedia/commons/b/b2/Interiorofawatercooledcomputer.png`,
+  "cool-air": `${WIKI}/0/08/Dust_in_CPU_cooler_IMG11619.jpg/500px-Dust_in_CPU_cooler_IMG11619.jpg`,
+  "case-o11": `${WIKI}/4/44/Lian_Li_PC-O11_Dynamic_20190601.jpg/500px-Lian_Li_PC-O11_Dynamic_20190601.jpg`,
+  "case-mid": `${WIKI}/f/fb/Fractal_Design_Focus_G.jpg/500px-Fractal_Design_Focus_G.jpg`,
+  "light-fans": `${WIKI}/9/98/RGB_computer_cooling_system_with_LED_lighting.jpg/500px-RGB_computer_cooling_system_with_LED_lighting.jpg`,
+  "light-panel": `${WIKI}/d/d8/Nanoleaf_Light_Panels_and_Remote.jpg/500px-Nanoleaf_Light_Panels_and_Remote.jpg`,
+  "audio-dac": `${WIKI}/8/84/Medion_Akoya_E6228_-_motherboard_-_Realtek_ALC269-6172.jpg/500px-Medion_Akoya_E6228_-_motherboard_-_Realtek_ALC269-6172.jpg`,
+  "audio-mon": `${WIKI}/9/9d/F-EX_Records_recording_studio_%E2%80%94_monitor_speaker_%28Moscow%2C_2025%29.png/500px-F-EX_Records_recording_studio_%E2%80%94_monitor_speaker_%28Moscow%2C_2025%29.png`,
+  "audio-mic": `${WIKI}/c/c9/Marius_Bear_SM7B.jpg/500px-Marius_Bear_SM7B.jpg`,
+  "disp-oled": `${WIKI}/f/f5/Computer_monitor_remix_transparent.png/500px-Computer_monitor_remix_transparent.png`,
+  "disp-ultra": `${WIKI}/f/f5/Computer_monitor_remix_transparent.png/500px-Computer_monitor_remix_transparent.png`,
+  "kb-75": `${WIKI}/4/4d/Nice_little_Keychron_keyboard_and_Mac_Mini_%2854850084703%29.jpg/500px-Nice_little_Keychron_keyboard_and_Mac_Mini_%2854850084703%29.jpg`,
+  "mouse-sup": `${WIKI}/4/42/G502_Hero.jpg/500px-G502_Hero.jpg`,
+  "chair-erg": `${WIKI}/8/8a/Prototype_ergonomic_office_chair%2C_V%26A_London.jpg/500px-Prototype_ergonomic_office_chair%2C_V%26A_London.jpg`,
+  "ram-32": `${WIKI}/d/d1/Tridentz_red_RAM.JPG/500px-Tridentz_red_RAM.JPG`,
+  "ram-16": `${WIKI}/5/5e/G.Skill_RipjawsX_DDR3_memory_modules.JPG/500px-G.Skill_RipjawsX_DDR3_memory_modules.JPG`,
+};
+
+export const partImage = (p: HardwarePart): string | undefined => IMG[p.id] ?? PART_IMAGES[p.slot];
 
 export const SLOTS: { slot: PartSlot; label: string; core: boolean }[] = [
   { slot: "cpu", label: "Processor", core: true },

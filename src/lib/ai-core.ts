@@ -1,4 +1,5 @@
 import type { ChatMessage } from "./store";
+import { useApp } from "./store";
 
 export interface VizierAction {
   type:
@@ -86,10 +87,6 @@ export function buildContext(state: Record<string, unknown>): string {
   return `CURRENT STATE SNAPSHOT:\n${JSON.stringify(state).slice(0, 6000)}`;
 }
 
-const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-const DEFAULT_MODEL = "openrouter/auto";
-const FALLBACK_MODELS = ["openrouter/auto", "openai/gpt-4o-mini"];
-
 export interface VizierAttachment {
   /** data: URL (image/*) */
   dataUrl: string;
@@ -97,8 +94,19 @@ export interface VizierAttachment {
   name?: string;
 }
 
+const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+const DEFAULT_MODEL = "openrouter/auto";
+const FALLBACK_MODELS = ["openrouter/auto", "openai/gpt-4o-mini"];
+
+/**
+ * Client-side OpenRouter call. The app is fully client-side, so the key lives
+ * in the operator's browser only:
+ * 1. localStorage (entered in System Core) — primary,
+ * 2. `VITE_OPENROUTER_API_KEY` from a .env at build time — fallback.
+ * It is never logged, never sent anywhere except OpenRouter, and never
+ * committed to git (see .env.example).
+ */
 export async function callVizier(
-  apiKey: string,
   history: ChatMessage[],
   contextBlock: string,
   model: string = DEFAULT_MODEL,
@@ -109,10 +117,12 @@ export async function callVizier(
     memoryNotes?: string[];
   } = {},
 ): Promise<VizierReply> {
+  const stored = useApp.getState().openrouterKey;
+  const apiKey = (stored ?? "").trim() || (import.meta.env.VITE_OPENROUTER_API_KEY ?? "");
   if (!apiKey) {
     return {
       message:
-        "No OpenRouter API key configured. Set your key in System Core before issuing commands.",
+        "No OpenRouter API key configured. Add your key in System Core (it stays in your browser), or set VITE_OPENROUTER_API_KEY at build time.",
       actions: [],
     };
   }
@@ -178,8 +188,8 @@ export async function callVizier(
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
         "HTTP-Referer":
-          typeof window !== "undefined" ? window.location.origin : "https://cybertime.machine",
-        "X-Title": "CyberTime Machine",
+          typeof window !== "undefined" ? window.location.origin : "https://cyber-command-core.vercel.app",
+        "X-Title": "Cyber Command Core",
       },
       body: JSON.stringify({ ...body, model: m }),
     });
@@ -199,9 +209,6 @@ export async function callVizier(
 
   return parseReply(text);
 }
-
-// Back-compat alias.
-export const callGemini = callVizier;
 
 function parseReply(raw: string): VizierReply {
   const trimmed = raw.trim();

@@ -16,11 +16,12 @@ import { toast } from "sonner";
 import { Bell, KeyRound, ShieldCheck, User, Brain, Download, Trash2, Upload, Cpu } from "lucide-react";
 import { requestNotifyAndShow } from "@/lib/pwa";
 import { tzName } from "@/lib/clock";
+import { HudLabel } from "../HudLabel";
 
 export function SettingsTab() {
   const {
-    geminiKey,
-    setGeminiKey,
+    openrouterKey,
+    setOpenrouterKey,
     notificationsEnabled,
     setNotificationsEnabled,
     profile,
@@ -31,7 +32,7 @@ export function SettingsTab() {
     clearMemoryNotes,
     resetAll,
   } = useApp();
-  const [tmp, setTmp] = useState(geminiKey);
+  const [tmp, setTmp] = useState(openrouterKey);
   const [name, setName] = useState(profile.name);
   const [role, setRole] = useState(profile.role);
 
@@ -84,10 +85,11 @@ export function SettingsTab() {
       />
 
       <div className="grid gap-4 md:grid-cols-2">
-        <div className="glass-panel p-5">
-          <div className="mb-3 flex items-center gap-2">
-            <User className="size-4 text-[var(--neon-cyan)]" />
-            <h3 className="text-sm font-bold uppercase tracking-widest">Operator Profile</h3>
+        <div className="glass-panel relative p-5">
+          <span className="pointer-events-none absolute left-0 top-0 size-2.5 border-l-2 border-t-2 border-[var(--holo-cyan)/50]" />
+          <div className="mb-4 flex items-center gap-2">
+            <User className="size-4 text-[var(--holo-cyan)]" />
+            <HudLabel accent="cyan">Operator Profile</HudLabel>
           </div>
           <div className="space-y-3">
             <div className="flex items-center gap-3">
@@ -100,7 +102,7 @@ export function SettingsTab() {
               </div>
               <label className="cursor-pointer">
                 <input type="file" accept="image/*" className="hidden" onChange={onAvatar} />
-                <span className="inline-flex items-center gap-1 rounded-md border border-border bg-background/60 px-3 py-1.5 text-xs hover:border-[var(--neon-cyan)]/50 transition">
+                <span className="inline-flex items-center gap-1 rounded-md border border-border bg-background/60 px-3 py-1.5 text-xs hover:border-[var(--holo-cyan)]/50 transition">
                   <Upload className="size-3.5" /> Upload avatar
                 </span>
               </label>
@@ -133,10 +135,11 @@ export function SettingsTab() {
           </div>
         </div>
 
-        <div className="glass-panel p-5">
-          <div className="mb-3 flex items-center gap-2">
-            <Bell className="size-4 text-[var(--neon-violet)]" />
-            <h3 className="text-sm font-bold uppercase tracking-widest">Alert Broadcast</h3>
+        <div className="glass-panel relative p-5">
+          <span className="pointer-events-none absolute left-0 top-0 size-2.5 border-l-2 border-t-2 border-[var(--holo-violet)/50]" />
+          <div className="mb-4 flex items-center gap-2">
+            <Bell className="size-4 text-[var(--holo-violet)]" />
+            <HudLabel accent="violet">Alert Broadcast</HudLabel>
           </div>
           <p className="text-xs text-muted-foreground mb-3">
             Native browser notifications fire only on critical events:
@@ -171,10 +174,11 @@ export function SettingsTab() {
           </Button>
         </div>
 
-        <div className="glass-panel p-5">
-          <div className="mb-3 flex items-center gap-2">
-            <Brain className="size-4 text-[var(--neon-violet)]" />
-            <h3 className="text-sm font-bold uppercase tracking-widest">AI Processing</h3>
+        <div className="glass-panel relative p-5">
+          <span className="pointer-events-none absolute left-0 top-0 size-2.5 border-l-2 border-t-2 border-[var(--holo-violet)/50]" />
+          <div className="mb-4 flex items-center gap-2">
+            <Brain className="size-4 text-[var(--holo-violet)]" />
+            <HudLabel accent="violet">AI Processing</HudLabel>
           </div>
           <div className="mb-3">
             <Label className="text-xs uppercase tracking-widest text-muted-foreground">
@@ -198,7 +202,7 @@ export function SettingsTab() {
               <span className="text-xs uppercase tracking-widest text-muted-foreground">
                 Memory notes
               </span>
-              <span className="font-mono text-xs text-[var(--neon-cyan)]">
+              <span className="font-mono text-xs text-[var(--holo-cyan)]">
                 {memory.notes.length}
               </span>
             </div>
@@ -216,10 +220,11 @@ export function SettingsTab() {
           </div>
         </div>
 
-        <div className="glass-panel p-5">
-          <div className="mb-3 flex items-center gap-2">
-            <Download className="size-4 text-[var(--neon-cyan)]" />
-            <h3 className="text-sm font-bold uppercase tracking-widest">Data Export</h3>
+        <div className="glass-panel relative p-5">
+          <span className="pointer-events-none absolute left-0 top-0 size-2.5 border-l-2 border-t-2 border-[var(--holo-cyan)/50]" />
+          <div className="mb-4 flex items-center gap-2">
+            <Download className="size-4 text-[var(--holo-cyan)]" />
+            <HudLabel accent="cyan">Data Export</HudLabel>
           </div>
           <p className="text-xs text-muted-foreground mb-3">
             Download the full local state (tasks, schedule, prayers, chats) as JSON.
@@ -229,10 +234,11 @@ export function SettingsTab() {
           </Button>
         </div>
 
-        <div className="glass-panel p-5 border-[var(--neon-pink)]/30">
-          <div className="mb-3 flex items-center gap-2">
-            <Trash2 className="size-4 text-[var(--neon-pink)]" />
-            <h3 className="text-sm font-bold uppercase tracking-widest">System Reset</h3>
+        <div className="glass-panel relative p-5 border-[var(--holo-pink)]/25">
+          <span className="pointer-events-none absolute left-0 top-0 size-2.5 border-l-2 border-t-2 border-[var(--holo-pink)/50]" />
+          <div className="mb-4 flex items-center gap-2">
+            <Trash2 className="size-4 text-[var(--holo-pink)]" />
+            <HudLabel accent="pink">System Reset</HudLabel>
           </div>
           <p className="text-xs text-muted-foreground mb-3">
             Irreversible. Wipes every streak, block, task, chat session and memory note
@@ -247,21 +253,26 @@ export function SettingsTab() {
               resetAll();
             }}
             variant="secondary"
-            className="w-full border border-[var(--neon-pink)]/40 text-[var(--neon-pink)] hover:bg-[var(--neon-pink)]/10"
+            className="w-full border border-[var(--holo-pink)]/40 text-[var(--holo-pink)] hover:bg-[var(--holo-pink)]/10"
           >
             <Trash2 className="size-4 mr-2" /> Reset App
           </Button>
         </div>
 
-        <div className="glass-panel p-5 md:col-span-2">
-          <div className="mb-3 flex items-center gap-2">
-            <KeyRound className="size-4 text-[var(--neon-pink)]" />
-            <h3 className="text-sm font-bold uppercase tracking-widest">OpenRouter API Key</h3>
+        <div className="glass-panel relative p-5 md:col-span-2">
+          <span className="pointer-events-none absolute left-0 top-0 size-2.5 border-l-2 border-t-2 border-[var(--holo-pink)/50]" />
+          <span className="pointer-events-none absolute right-0 top-0 size-2.5 border-r-2 border-t-2 border-[var(--holo-pink)/50]" />
+          <div className="mb-4 flex items-center gap-2">
+            <KeyRound className="size-4 text-[var(--holo-pink)]" />
+            <HudLabel accent="pink">OpenRouter API Key</HudLabel>
           </div>
           <p className="text-xs text-muted-foreground mb-3">
-            Stored locally in this browser only. Required to operate The Vizier. Routes through
-            <span className="font-mono"> openrouter.ai/api/v1 </span> using model
-            <span className="font-mono"> {settings.aiModel}</span>.
+            Your OpenRouter key is stored <b className="text-foreground">only in this browser</b>
+            (localStorage) and is sent <b className="text-foreground">only to openrouter.ai</b> — never to any
+            other server, never logged, never committed to the repo. As a build-time fallback you may set
+            <span className="font-mono"> VITE_OPENROUTER_API_KEY</span> in a local
+            <span className="font-mono"> .env</span> (see
+            <span className="font-mono"> .env.example</span>).
           </p>
           <div className="mb-3">
             <Label className="text-xs uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
@@ -293,15 +304,21 @@ export function SettingsTab() {
             />
             <Button
               onClick={() => {
-                setGeminiKey(tmp.trim());
+                setOpenrouterKey(tmp.trim());
                 toast.success("OpenRouter key saved locally.");
               }}
             >
               Save
             </Button>
           </div>
-          <p className="mt-3 text-[11px] text-muted-foreground font-mono">
-            Status: {geminiKey ? `Configured (${geminiKey.slice(0, 6)}…)` : "Not configured"}
+          <p className="mt-3 flex items-center gap-1.5 text-[11px] text-muted-foreground font-mono">
+            <ShieldCheck
+              className={openrouterKey ? "size-3.5 text-[var(--holo-green)]" : "size-3.5 text-muted-foreground/60"}
+            />
+            Status: {openrouterKey ? "Configured — stored in this browser only" : "Not configured"}
+            {!openrouterKey && import.meta.env.VITE_OPENROUTER_API_KEY && (
+              <span className="text-[var(--holo-cyan)]"> · VITE_OPENROUTER_API_KEY fallback active</span>
+            )}
           </p>
         </div>
       </div>

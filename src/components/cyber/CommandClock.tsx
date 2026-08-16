@@ -29,9 +29,9 @@ export function CommandClock({ size = 96 }: Props) {
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="absolute inset-0">
         <defs>
           <linearGradient id="clockRing" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="var(--neon-cyan)" />
-            <stop offset="50%" stopColor="var(--neon-violet)" />
-            <stop offset="100%" stopColor="var(--neon-pink)" />
+            <stop offset="0%" stopColor="var(--holo-cyan)" />
+            <stop offset="50%" stopColor="var(--holo-violet)" />
+            <stop offset="100%" stopColor="var(--holo-pink)" />
           </linearGradient>
           <filter id="clockGlow" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur stdDeviation="2.4" result="blur" />
@@ -94,7 +94,7 @@ export function CommandClock({ size = 96 }: Props) {
           {hh}:{mm}
         </div>
         <div
-          className="font-mono-tech mt-0.5 text-[9px] tracking-[0.32em] text-[var(--neon-cyan)] tabular-nums"
+          className="font-mono-tech mt-0.5 text-[9px] tracking-[0.32em] text-[var(--holo-cyan)] tabular-nums"
           suppressHydrationWarning
         >
           {ss} {ampm}

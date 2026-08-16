@@ -4,10 +4,10 @@ import { useApp, type AppNotification } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
 const kindColor: Record<AppNotification["kind"], string> = {
-  milestone: "text-[var(--neon-cyan)]",
-  deadline: "text-[var(--neon-pink)]",
-  block: "text-[var(--neon-violet)]",
-  prayer: "text-[var(--neon-cyan)]",
+  milestone: "text-[var(--holo-cyan)]",
+  deadline: "text-[var(--holo-pink)]",
+  block: "text-[var(--holo-violet)]",
+  prayer: "text-[var(--holo-cyan)]",
   system: "text-muted-foreground",
 };
 
@@ -33,13 +33,13 @@ export function NotificationBell() {
         onClick={() => setOpen((v) => !v)}
         className={cn(
           "glass-panel relative flex size-9 items-center justify-center transition",
-          open && "border-[var(--neon-cyan)]/50",
+          open && "border-[var(--holo-cyan)]/50",
         )}
         title="Notifications"
       >
-        <Bell className="size-4 text-[var(--neon-cyan)]" />
+        <Bell className="size-4 text-[var(--holo-cyan)]" />
         {count > 0 && (
-          <span className="absolute -top-1 -right-1 flex min-w-[18px] items-center justify-center rounded-full bg-[var(--neon-pink)] px-1 text-[9px] font-bold text-background shadow-[0_0_10px_var(--neon-pink)]">
+          <span className="absolute -top-1 -right-1 flex min-w-[18px] items-center justify-center rounded-full bg-[var(--holo-pink)] px-1 text-[9px] font-bold text-background shadow-[0_0_10px_var(--holo-pink)]">
             {count > 99 ? "99+" : count}
           </span>
         )}
@@ -99,7 +99,7 @@ export function NotificationBell() {
                         }
                         dismissNotification(n.id);
                       }}
-                      className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-[var(--neon-pink)]"
+                      className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-[var(--holo-pink)]"
                       title="Dismiss"
                     >
                       <X className="size-3.5" />

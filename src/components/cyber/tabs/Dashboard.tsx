@@ -1,10 +1,12 @@
 import { useApp, PRAYERS, todayStr, type ScheduleBlock } from "@/lib/store";
 import { PanelHeader } from "../PanelHeader";
+import { HudLabel } from "../HudLabel";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Flame, Target, CalendarClock, Moon, Coins, Timer } from "lucide-react";
+import { Coins } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNow, to12h } from "@/lib/clock";
 import { useGsapReveal } from "@/hooks/useGsapReveal";
+import { cn } from "@/lib/utils";
 
 function activeOrNextBlock(blocks: ScheduleBlock[], now: Date) {
   const dow = now.getDay();
@@ -34,7 +36,7 @@ function Radial({ value }: { value: number }) {
   const off = c - (value / 100) * c;
   return (
     <svg width="140" height="140" viewBox="0 0 140 140">
-      <circle cx="70" cy="70" r={r} stroke="var(--color-border)" strokeWidth="10" fill="none" />
+      <circle cx="70" cy="70" r={r} stroke="oklch(1 1 1 / 0.08)" strokeWidth="10" fill="none" />
       <circle
         cx="70"
         cy="70"
@@ -50,8 +52,8 @@ function Radial({ value }: { value: number }) {
       />
       <defs>
         <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="var(--color-primary)" />
-          <stop offset="100%" stopColor="var(--color-accent)" />
+          <stop offset="0%" stopColor="var(--holo-cyan)" />
+          <stop offset="100%" stopColor="var(--holo-violet)" />
         </linearGradient>
       </defs>
       <text
@@ -65,6 +67,32 @@ function Radial({ value }: { value: number }) {
         {value}%
       </text>
     </svg>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  sub,
+  accent = "text-foreground",
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  accent?: string;
+}) {
+  return (
+    <div className="glass-panel px-4 py-3">
+      <div className="font-mono text-[9px] uppercase tracking-[0.25em] text-muted-foreground">
+        {label}
+      </div>
+      <div className="mt-1.5 flex items-baseline gap-2">
+        <span className={cn("font-mono-tech text-[22px] font-bold tabular-nums leading-none", accent)}>
+          {value}
+        </span>
+        {sub && <span className="truncate text-[11px] text-muted-foreground">{sub}</span>}
+      </div>
+    </div>
   );
 }
 
@@ -119,7 +147,7 @@ export function DashboardTab() {
   }, [nextPrayer, now]);
 
   const eta = useMemo(() => {
-    if (!nb || !now) return "--:--";
+    if (!nb || !now) return "--:--:--";
     const targetHHMM = nb.state === "active" ? nb.end : nb.start;
     const [h, m] = targetHHMM.split(":").map(Number);
     const target = new Date(now);
@@ -131,90 +159,117 @@ export function DashboardTab() {
     return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")}`;
   }, [nb, now]);
 
+  const prayerDone = PRAYERS.filter((p) => todayPrayers[p.name]).length;
+
   return (
     <div>
       <PanelHeader
-        eyebrow="Command"
-        title="Dashboard"
-        subtitle="Today's operating picture, at a glance."
+        eyebrow="Command Hub"
+        title="Tactical Overview"
+        subtitle="Live operating picture — time, discipline and momentum at a glance."
         right={
           <div className="glass-panel flex items-center gap-2 px-3.5 py-2">
-            <Coins className="size-4 text-primary" />
-            <span className="font-mono-tech text-lg font-bold tabular-nums">
+            <Coins className="size-4 text-[var(--holo-amber)]" />
+            <span className="font-mono-tech text-lg font-bold tabular-nums text-[var(--holo-amber)]">
               {mounted ? credits : 0}
             </span>
             <span className="text-xs text-muted-foreground">
-              Cyber Credits{earnedToday > 0 ? ` · +${earnedToday} today` : ""}
+              CR{earnedToday > 0 ? ` · +${earnedToday} today` : ""}
             </span>
           </div>
         }
       />
 
-      <div ref={gridRef} className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <div className="glass-panel md:col-span-2 p-5">
-          <div className="mb-3 flex items-center gap-2">
-            <Timer className="size-4 text-primary" />
-            <h3 className="text-sm font-semibold">Next prayer</h3>
-            {nextPrayer && (
-              <span className="ml-auto text-xs text-muted-foreground">
-                {nextPrayer.name} at {to12h(nextPrayer.time)}
-              </span>
-            )}
-          </div>
-          {nextPrayer ? (
-            <div className="flex items-baseline justify-between">
-              <div className="text-2xl font-semibold">{nextPrayer.name}</div>
-              <div className="font-mono-tech text-4xl font-bold tabular-nums">{prayerETA}</div>
-            </div>
-          ) : (
-            <div className="text-sm text-muted-foreground italic">Prayer times loading…</div>
-          )}
-        </div>
+      {/* Telemetry strip */}
+      <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+        <Stat
+          label="Next Prayer"
+          value={nextPrayer?.name ?? "--"}
+          sub={nextPrayer ? to12h(nextPrayer.time) : ""}
+          accent="text-[var(--holo-cyan)]"
+        />
+        <Stat
+          label={nb?.state === "active" ? "Block Ends" : "Block Starts"}
+          value={nb ? nb.title.split(" ")[0] : "Open"}
+          sub={nb ? to12h(nb.state === "active" ? nb.end : nb.start) : "no blocks"}
+          accent="text-[var(--holo-violet)]"
+        />
+        <Stat
+          label="Completion"
+          value={`${pct}%`}
+          sub={`${done}/${tasks.length} missions`}
+          accent="text-[var(--holo-green)]"
+        />
+        <Stat label="Streak" value={String(streak)} sub="day streak" accent="text-[var(--holo-amber)]" />
+        <Stat label="Namaz" value={`${prayerDone}/5`} sub="logged today" accent="text-[var(--holo-cyan)]" />
+      </div>
 
-        <div className="glass-panel p-5 flex flex-col items-center justify-center text-center">
-          <div className="mb-2 text-xs text-muted-foreground">Daily completion</div>
+      <div ref={gridRef} className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        {/* Hero — completion radial */}
+        <div className="glass-panel flex flex-col items-center justify-center p-5 text-center">
+          <HudLabel className="mb-3 self-center">Mission Completion</HudLabel>
           <Radial value={pct} />
           <div className="mt-3 flex items-center gap-2 text-sm">
-            <Flame className="size-4 text-primary" />
-            <span className="font-mono-tech">{streak}</span>
+            <span className="font-mono-tech text-lg font-bold text-[var(--holo-amber)]">{streak}</span>
             <span className="text-muted-foreground">day streak</span>
+          </div>
+          <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground/70">
+            {pct >= 100 ? "ALL DIRECTIVES EXECUTED" : pct >= 50 ? "HOLD THE LINE" : "INITIATE"}
           </div>
         </div>
 
-        <div className="glass-panel md:col-span-2 p-5">
-          <div className="mb-4 flex items-center gap-2">
-            <Target className="size-4 text-primary" />
-            <h3 className="text-sm font-semibold">Priority queue</h3>
-            <span className="ml-auto text-xs text-muted-foreground">{tasks.length - done} open</span>
-          </div>
-          <ul className="space-y-2">
+        {/* Priority queue */}
+        <div className="glass-panel p-5 md:col-span-2">
+          <HudLabel accent="violet">Priority Queue</HudLabel>
+          <ul className="mt-4 space-y-2">
             {top.length === 0 && (
-              <li className="text-sm text-muted-foreground italic">Queue clear. Issue new directives.</li>
+              <li className="text-sm italic text-muted-foreground">
+                Queue clear. Issue new directives.
+              </li>
             )}
             {top.map((t) => (
               <li
                 key={t.id}
-                className="flex items-center gap-3 rounded-lg border border-border bg-background/40 px-3 py-2 transition hover:border-primary/50"
+                className="flex items-center gap-3 rounded-lg border border-[oklch(1_1_1/0.05)] bg-[oklch(1_1_1/0.02)] px-3 py-2.5 transition hover:border-[oklch(0.85_0.17_200/0.35)] hover:bg-[oklch(0.85_0.17_200/0.04)]"
               >
                 <Checkbox checked={t.done} onCheckedChange={() => toggleTask(t.id)} />
-                <span className="flex-1 text-sm">{t.title}</span>
+                <span className="flex-1 text-sm text-foreground/90">{t.title}</span>
                 <PriorityChip p={t.priority} />
               </li>
             ))}
           </ul>
         </div>
 
-        <div className="glass-panel p-5 row-span-1">
-          <div className="mb-4 flex items-center gap-2">
-            <Moon className="size-4 text-primary" />
-            <h3 className="text-sm font-semibold">Daily namaz</h3>
-            <span className="ml-auto text-xs text-muted-foreground">
-              {PRAYERS.filter((p) => todayPrayers[p.name]).length}/5
-            </span>
-          </div>
-          <ul className="space-y-2">
+        {/* Next prayer — live countdown */}
+        <div className="glass-panel p-5">
+          <HudLabel accent="green">Next Prayer</HudLabel>
+          {nextPrayer ? (
+            <div className="mt-4 flex flex-col items-start gap-2">
+              <div className="flex items-baseline gap-3">
+                <span className="text-3xl font-bold tracking-tight">{nextPrayer.name}</span>
+                <span className="font-mono text-xs text-muted-foreground">
+                  {to12h(nextPrayer.time)}
+                </span>
+              </div>
+              <div className="font-mono-tech text-3xl font-bold tabular-nums text-[var(--holo-cyan)]">
+                {prayerETA}
+              </div>
+              <div className="mt-2 flex items-center gap-2 font-mono text-[9px] uppercase tracking-[0.25em] text-muted-foreground/70">
+                <span className="led-dot size-1.5" style={{ color: "var(--holo-green)" }} />
+                Countdown locked
+              </div>
+            </div>
+          ) : (
+            <div className="mt-4 text-sm italic text-muted-foreground">Prayer times loading…</div>
+          )}
+        </div>
+
+        {/* Daily namaz */}
+        <div className="glass-panel p-5">
+          <HudLabel accent="cyan">Daily Namaz</HudLabel>
+          <ul className="mt-4 space-y-2.5">
             {PRAYERS.map((p) => (
-              <li key={p.name} className="flex items-center gap-2 text-sm">
+              <li key={p.name} className="flex items-center gap-2.5 text-sm">
                 <Checkbox
                   checked={!!todayPrayers[p.name]}
                   onCheckedChange={() => togglePrayer(today, p.name)}
@@ -226,38 +281,38 @@ export function DashboardTab() {
               </li>
             ))}
           </ul>
-          <div className="mt-3 text-[11px] text-muted-foreground">
-            Complete all five for a +5 credit bonus.
+          <div className="mt-4 border-t border-[oklch(1_1_1/0.06)] pt-2.5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground/70">
+            Full cycle +5 CR bonus
           </div>
         </div>
 
-        <div className="glass-panel p-5 md:col-span-3">
-          <div className="mb-4 flex items-center gap-2">
-            <CalendarClock className="size-4 text-accent" />
-            <h3 className="text-sm font-semibold">
-              {nb?.state === "active" ? "Now running" : "Next block"}
-            </h3>
-            {nb?.state === "active" && (
-              <span className="ml-1 rounded-md border border-primary/40 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
-                Live
-              </span>
-            )}
-          </div>
+        {/* Schedule beacon */}
+        <div className="glass-panel p-5">
+          <HudLabel accent="amber">Schedule Beacon</HudLabel>
           {nb ? (
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-2xl font-semibold">{nb.title}</div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  {to12h(nb.start)} → {to12h(nb.end)}
-                  <span className="ml-2 text-[11px] text-muted-foreground/70">
-                    {nb.state === "active" ? "ends in" : "starts in"}
+            <div className="mt-4">
+              <div className="flex items-center justify-between gap-2">
+                <span className="truncate text-lg font-semibold">{nb.title}</span>
+                {nb.state === "active" && (
+                  <span className="shrink-0 rounded-full border border-[var(--holo-green)]/40 bg-[oklch(0.8_0.16_155/0.1)] px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest text-[var(--holo-green)]">
+                    Live
                   </span>
-                </div>
+                )}
               </div>
-              <div className="font-mono-tech text-4xl font-bold tabular-nums">{eta}</div>
+              <div className="mt-1 font-mono text-xs text-muted-foreground">
+                {to12h(nb.start)} → {to12h(nb.end)}
+              </div>
+              <div className="mt-3 font-mono-tech text-3xl font-bold tabular-nums text-[var(--holo-amber)]">
+                {eta}
+              </div>
+              <div className="mt-1 font-mono text-[9px] uppercase tracking-[0.25em] text-muted-foreground/70">
+                {nb.state === "active" ? "ends in" : "starts in"}
+              </div>
             </div>
           ) : (
-            <div className="text-sm text-muted-foreground italic">No further scheduled blocks today.</div>
+            <div className="mt-4 text-sm italic text-muted-foreground">
+              No scheduled blocks today — open territory.
+            </div>
           )}
         </div>
       </div>
@@ -267,13 +322,13 @@ export function DashboardTab() {
 
 function PriorityChip({ p }: { p: "low" | "medium" | "high" | "critical" }) {
   const map = {
-    low: "border-border text-muted-foreground",
-    medium: "border-primary/40 text-primary",
-    high: "border-accent/50 text-accent",
-    critical: "border-destructive/50 text-destructive",
+    low: "border-[oklch(1_1_1/0.1)] text-muted-foreground",
+    medium: "border-[oklch(0.85_0.17_200/0.4)] text-[var(--holo-cyan)]",
+    high: "border-[oklch(0.66_0.27_295/0.5)] text-[var(--holo-violet)]",
+    critical: "border-[oklch(0.72_0.24_350/0.5)] text-[var(--holo-pink)]",
   } as const;
   return (
-    <span className={`rounded-md border px-2 py-0.5 text-[10px] font-medium capitalize ${map[p]}`}>
+    <span className={`shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-medium capitalize ${map[p]}`}>
       {p}
     </span>
   );

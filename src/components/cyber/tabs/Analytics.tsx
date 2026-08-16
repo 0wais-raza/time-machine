@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
 import { useApp, PRAYERS } from "@/lib/store";
 import { PanelHeader } from "../PanelHeader";
+import { HudLabel } from "../HudLabel";
 import { Button } from "@/components/ui/button";
-import { Sparkles } from "lucide-react";
+import { Sparkles, Coins } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -17,9 +18,9 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { buildContext, callGemini } from "@/lib/gemini";
+import { buildContext, callVizier } from "@/lib/ai-core";
 import { toast } from "sonner";
-import { Gauge, Coins } from "lucide-react";
+import { Gauge } from "lucide-react";
 import { todayStr } from "@/lib/store";
 import { useGsapReveal } from "@/hooks/useGsapReveal";
 
@@ -33,6 +34,80 @@ function lastNDays(n: number): string[] {
   return arr;
 }
 
+const CHART_TOOLTIP = {
+  contentStyle: {
+    background: "oklch(0.16 0.03 260 / 0.95)",
+    border: "1px solid oklch(0.85 0.17 200 / 0.25)",
+    borderRadius: 10,
+    fontSize: 12,
+    backdropFilter: "blur(8px)",
+  },
+  labelStyle: { color: "oklch(0.9 0.02 260)" },
+  itemStyle: { color: "var(--color-foreground)" },
+} as const;
+
+const AXIS = { stroke: "oklch(0.85 0.17 200 / 0.35)", fontSize: 10 } as const;
+
+function Stat({
+  label,
+  value,
+  sub,
+  accent = "text-foreground",
+  icon,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  accent?: string;
+  icon?: React.ReactNode;
+}) {
+  return (
+    <div className="glass-panel relative px-4 py-3.5">
+      <span className="pointer-events-none absolute left-0 top-0 size-2 border-l-2 border-t-2 border-[var(--holo-cyan)/50]" />
+      <div className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.25em] text-muted-foreground">
+        {icon}
+        {label}
+      </div>
+      <div className="mt-1.5 flex items-baseline gap-2">
+        <span className={cn("font-mono-tech text-[22px] font-bold tabular-nums leading-none", accent)}>
+          {value}
+        </span>
+        {sub && <span className="truncate text-[11px] text-muted-foreground">{sub}</span>}
+      </div>
+    </div>
+  );
+}
+
+function ChartPanel({
+  label,
+  accent = "cyan",
+  children,
+  right,
+}: {
+  label: string;
+  accent?: "cyan" | "violet" | "amber" | "green";
+  children: React.ReactNode;
+  right?: React.ReactNode;
+}) {
+  return (
+    <div className="glass-panel relative p-5">
+      <span className="pointer-events-none absolute left-0 top-0 size-2.5 border-l-2 border-t-2 border-[var(--holo-cyan)/60]" />
+      <span className="pointer-events-none absolute right-0 top-0 size-2.5 border-r-2 border-t-2 border-[var(--holo-cyan)/60]" />
+      <span className="pointer-events-none absolute bottom-0 left-0 size-2.5 border-b-2 border-l-2 border-[var(--holo-cyan)/60]" />
+      <span className="pointer-events-none absolute bottom-0 right-0 size-2.5 border-b-2 border-r-2 border-[var(--holo-cyan)/60]" />
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <HudLabel accent={accent}>{label}</HudLabel>
+        {right}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function cn(...parts: (string | undefined | false)[]) {
+  return parts.filter(Boolean).join(" ");
+}
+
 export function AnalyticsTab() {
   const app = useApp();
   const tasks = Array.isArray(app.tasks) ? app.tasks : [];
@@ -41,7 +116,7 @@ export function AnalyticsTab() {
   const completedBlocks = app.completedBlocks ?? {};
   const creditHistory = app.creditHistory ?? {};
   const credits = app.credits ?? 0;
-  const { geminiKey, sessions, activeSessionId, settings } = app;
+  const { sessions, activeSessionId, settings } = app;
   const [summary, setSummary] = useState<string>("");
   const [busy, setBusy] = useState(false);
   const gridRef = useGsapReveal<HTMLDivElement>("analytics");
@@ -93,7 +168,11 @@ export function AnalyticsTab() {
     const todayP = prayers[today] ?? {};
     const prayerPct = Object.values(todayP).filter(Boolean).length / 5;
     const totalBlocks = blocks.length || 1;
-    const adherence = Math.min(1, blocks.filter((b) => b.date === today).length / Math.max(1, blocks.filter((b) => b.date === today).length));
+    const adherence = Math.min(
+      1,
+      blocks.filter((b) => b.date === today).length /
+        Math.max(1, blocks.filter((b) => b.date === today).length),
+    );
     return Math.round((taskPct * 0.5 + adherence * 0.3 + prayerPct * 0.2) * 100);
   }, [tasks, prayers, blocks]);
 
@@ -126,8 +205,7 @@ export function AnalyticsTab() {
       const ctx = buildContext({ tasks, blocks, prayers, mode: "analytics-summary" });
       const session = sessions.find((s) => s.id === activeSessionId) ?? sessions[0];
       const recent = session?.messages.slice(-3) ?? [];
-      const reply = await callGemini(
-        geminiKey,
+      const reply = await callVizier(
         [
           ...recent,
           {
@@ -155,141 +233,131 @@ export function AnalyticsTab() {
   return (
     <div>
       <PanelHeader
-        eyebrow="Signals"
-        title="Analytics"
-        subtitle="Performance, consistency, and credit flow."
+        eyebrow="Signals / Telemetry"
+        title="Analytics Arcade"
+        subtitle="Performance, consistency and credit flow — decoded."
       />
 
-      <div className="mb-4 grid gap-4 md:grid-cols-3">
-        <div className="glass-panel flex items-center justify-between px-5 py-4">
-          <div>
-            <div className="text-xs text-muted-foreground">Productivity score</div>
-            <div className="font-mono-tech text-3xl font-bold tabular-nums">
-              {score}<span className="text-base text-muted-foreground">/100</span>
-            </div>
-          </div>
-        </div>
-        <div className="glass-panel flex items-center justify-between px-5 py-4">
-          <div>
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Gauge className="size-3" /> Execution velocity
-            </div>
-            <div className="font-mono-tech text-3xl font-bold tabular-nums text-primary">
-              {velocity.pct}<span className="text-base text-muted-foreground">%</span>
-            </div>
-          </div>
-          <div className="text-right text-xs text-muted-foreground">
-            {velocity.done} done / {velocity.planned} blocks today
-          </div>
-        </div>
-        <div className="glass-panel flex items-center justify-between px-5 py-4">
-          <div>
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Coins className="size-3" /> Cyber Credits
-            </div>
-            <div className="font-mono-tech text-3xl font-bold tabular-nums">{credits}</div>
-          </div>
-          <div className="text-right text-xs text-muted-foreground">+{earnedToday} today</div>
-        </div>
+      {/* Telemetry strip */}
+      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <Stat
+          label="Productivity Score"
+          value={`${score}/100`}
+          sub={score >= 70 ? "NOMINAL" : score >= 40 ? "STABLE" : "CRITICAL"}
+          accent={score >= 70 ? "text-[var(--holo-green)]" : score >= 40 ? "text-[var(--holo-cyan)]" : "text-[var(--holo-pink)]"}
+        />
+        <Stat
+          label="Execution Velocity"
+          value={`${velocity.pct}%`}
+          sub={`${velocity.done} done / ${velocity.planned} blocks`}
+          accent="text-[var(--holo-violet)]"
+          icon={<Gauge className="size-3" />}
+        />
+        <Stat
+          label="Cyber Credits"
+          value={String(credits)}
+          sub={earnedToday > 0 ? `+${earnedToday} today` : "no gains today"}
+          accent="text-[var(--holo-amber)]"
+          icon={<Coins className="size-3" />}
+        />
       </div>
 
       <div ref={gridRef} className="grid gap-4 md:grid-cols-2">
-        <div className="glass-panel p-5">
-          <h3 className="mb-4 text-sm font-semibold">Daily credit earnings (14d)</h3>
+        <ChartPanel label="Credit Flow · 14d" accent="cyan">
           <ResponsiveContainer width="100%" height={220}>
             <AreaChart data={creditDaily}>
               <defs>
                 <linearGradient id="cr" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--color-primary)" stopOpacity={0.5} />
-                  <stop offset="100%" stopColor="var(--color-primary)" stopOpacity={0} />
+                  <stop offset="0%" stopColor="var(--holo-cyan)" stopOpacity={0.45} />
+                  <stop offset="100%" stopColor="var(--holo-cyan)" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-              <XAxis dataKey="day" stroke="var(--color-muted-foreground)" fontSize={10} interval={1} />
-              <YAxis stroke="var(--color-muted-foreground)" fontSize={10} allowDecimals={false} />
-              <Tooltip contentStyle={{ background: "var(--color-popover)", border: "1px solid var(--color-border)", borderRadius: 10 }} />
-              <Area type="monotone" dataKey="credits" stroke="var(--color-primary)" fill="url(#cr)" />
+              <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.85 0.17 200 / 0.08)" />
+              <XAxis dataKey="day" {...AXIS} interval={1} />
+              <YAxis {...AXIS} allowDecimals={false} />
+              <Tooltip {...CHART_TOOLTIP} />
+              <Area type="monotone" dataKey="credits" stroke="var(--holo-cyan)" strokeWidth={2} fill="url(#cr)" />
             </AreaChart>
           </ResponsiveContainer>
-        </div>
+        </ChartPanel>
 
-        <div className="glass-panel p-5">
-          <h3 className="mb-4 text-sm font-semibold">Weekly credit earnings</h3>
+        <ChartPanel label="Weekly Credit Yield" accent="amber">
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={creditWeekly}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-              <XAxis dataKey="week" stroke="var(--color-muted-foreground)" fontSize={10} />
-              <YAxis stroke="var(--color-muted-foreground)" fontSize={10} allowDecimals={false} />
-              <Tooltip contentStyle={{ background: "var(--color-popover)", border: "1px solid var(--color-border)", borderRadius: 10 }} />
-              <Bar dataKey="credits" fill="var(--color-accent)" radius={[8, 8, 0, 0]} />
+              <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.85 0.17 200 / 0.08)" />
+              <XAxis dataKey="week" {...AXIS} />
+              <YAxis {...AXIS} allowDecimals={false} />
+              <Tooltip {...CHART_TOOLTIP} cursor={{ fill: "oklch(0.85 0.17 200 / 0.06)" }} />
+              <Bar dataKey="credits" fill="var(--holo-amber)" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
-        </div>
+        </ChartPanel>
 
-        <div className="glass-panel p-5">
-          <h3 className="mb-4 text-sm font-semibold">Weekly productivity</h3>
+        <ChartPanel label="Productivity Trend · 7d" accent="violet">
           <ResponsiveContainer width="100%" height={220}>
             <AreaChart data={weekly}>
               <defs>
                 <linearGradient id="p1" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--color-primary)" stopOpacity={0.5} />
-                  <stop offset="100%" stopColor="var(--color-primary)" stopOpacity={0} />
+                  <stop offset="0%" stopColor="var(--holo-violet)" stopOpacity={0.45} />
+                  <stop offset="100%" stopColor="var(--holo-violet)" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-              <XAxis dataKey="day" stroke="var(--color-muted-foreground)" fontSize={10} />
-              <YAxis stroke="var(--color-muted-foreground)" fontSize={10} />
-              <Tooltip contentStyle={{ background: "var(--color-popover)", border: "1px solid var(--color-border)", borderRadius: 10 }} />
-              <Area type="monotone" dataKey="productivity" stroke="var(--color-primary)" fill="url(#p1)" />
+              <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.85 0.17 200 / 0.08)" />
+              <XAxis dataKey="day" {...AXIS} />
+              <YAxis {...AXIS} />
+              <Tooltip {...CHART_TOOLTIP} />
+              <Area type="monotone" dataKey="productivity" stroke="var(--holo-violet)" strokeWidth={2} fill="url(#p1)" />
             </AreaChart>
           </ResponsiveContainer>
-        </div>
+        </ChartPanel>
 
-        <div className="glass-panel p-5">
-          <h3 className="mb-4 text-sm font-semibold">Namaz consistency</h3>
+        <ChartPanel label="Namaz Consistency" accent="green">
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={weekly}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-              <XAxis dataKey="day" stroke="var(--color-muted-foreground)" fontSize={10} />
-              <YAxis domain={[0, 5]} stroke="var(--color-muted-foreground)" fontSize={10} />
-              <Tooltip contentStyle={{ background: "var(--color-popover)", border: "1px solid var(--color-border)", borderRadius: 10 }} />
-              <Bar dataKey="prayers" fill="var(--color-accent)" radius={[8, 8, 0, 0]} />
+              <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.85 0.17 200 / 0.08)" />
+              <XAxis dataKey="day" {...AXIS} />
+              <YAxis domain={[0, 5]} {...AXIS} />
+              <Tooltip {...CHART_TOOLTIP} cursor={{ fill: "oklch(0.8 0.16 155 / 0.06)" }} />
+              <Bar dataKey="prayers" fill="var(--holo-green)" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
-        </div>
+        </ChartPanel>
 
-        <div className="glass-panel p-5">
-          <h3 className="mb-4 text-sm font-semibold">Task completion</h3>
+        <ChartPanel label="Mission Completion" accent="cyan">
           <ResponsiveContainer width="100%" height={220}>
             <PieChart>
-              <Pie data={completion} dataKey="value" innerRadius={50} outerRadius={80}>
-                <Cell fill="var(--color-primary)" />
-                <Cell fill="var(--color-secondary)" />
+              <Pie data={completion} dataKey="value" innerRadius={55} outerRadius={85} paddingAngle={3} stroke="none">
+                <Cell fill="var(--holo-cyan)" />
+                <Cell fill="oklch(1 1 1 / 0.1)" />
               </Pie>
-              <Tooltip contentStyle={{ background: "var(--color-popover)", border: "1px solid var(--color-border)", borderRadius: 10 }} />
+              <Tooltip {...CHART_TOOLTIP} />
             </PieChart>
           </ResponsiveContainer>
-          <div className="mt-2 flex justify-center gap-4 text-xs">
-            <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-primary" /> Done</span>
-            <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-secondary" /> Open</span>
+          <div className="mt-2 flex justify-center gap-5 text-xs">
+            <span className="flex items-center gap-1.5 text-foreground/80">
+              <span className="size-2 rounded-full bg-[var(--holo-cyan)] shadow-[0_0_6px_1px_var(--holo-cyan)]" /> Done
+            </span>
+            <span className="flex items-center gap-1.5 text-foreground/80">
+              <span className="size-2 rounded-full bg-[oklch(1_1_1/0.1)]" /> Open
+            </span>
           </div>
-        </div>
+        </ChartPanel>
 
-        <div className="glass-panel p-5">
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-sm font-semibold">Vizier's executive brief</h3>
-            <Button size="sm" onClick={ask} disabled={busy}>
-              <Sparkles className="size-3.5 mr-1" /> {busy ? "Analyzing…" : "Generate"}
-            </Button>
-          </div>
-          <div className="min-h-[180px] rounded-lg border border-border bg-background/40 p-3 text-sm leading-relaxed whitespace-pre-wrap">
+        <ChartPanel label="Vizier Executive Brief" accent="violet" right={
+          <Button size="sm" onClick={ask} disabled={busy}>
+            <Sparkles className="size-3.5 mr-1" /> {busy ? "Analyzing…" : "Generate"}
+          </Button>
+        }>
+          <div className="relative min-h-[180px] rounded-lg border border-[oklch(0.85_0.17_200/0.2)] bg-[oklch(0.1_0.02_260/0.4)] p-4 text-sm leading-relaxed whitespace-pre-wrap">
+            <span className="pointer-events-none absolute left-0 top-0 size-2 border-l-2 border-t-2 border-[var(--holo-violet)/60]" />
+            <span className="pointer-events-none absolute right-0 top-0 size-2 border-b-2 border-r-2 border-[var(--holo-violet)/60]" />
             {summary || (
               <span className="text-muted-foreground italic">
                 Press Generate to receive a performance brief. Requires an OpenRouter API key in System Core.
               </span>
             )}
           </div>
-        </div>
+        </ChartPanel>
       </div>
     </div>
   );

@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/select";
 import { Plus, Trash2, Copy, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { HudLabel } from "./HudLabel";
 
 const HOUR_PX = 48;
 const SNAP_MIN = 15;
@@ -260,10 +261,16 @@ function DayColumn({
         />
       ))}
       {isToday && (
-        <div
-          className="absolute inset-x-0 z-30 h-px bg-primary"
-          style={{ top: (nowMins / 60) * HOUR_PX }}
-        />
+        <>
+          <div
+            className="absolute inset-x-0 z-30 h-px bg-[var(--holo-cyan)] shadow-[0_0_10px_1px_var(--holo-cyan)]"
+            style={{ top: (nowMins / 60) * HOUR_PX }}
+          />
+          <div
+            className="absolute z-30 size-1.5 -translate-y-1/2 rounded-full bg-[var(--holo-cyan)] shadow-[0_0_8px_2px_var(--holo-cyan)]"
+            style={{ top: (nowMins / 60) * HOUR_PX, left: -1 }}
+          />
+        </>
       )}
       {blocks.map((b) => (
         <BlockCard
@@ -378,38 +385,48 @@ export function ScheduleMatrix() {
 
   return (
     <div className="flex h-full flex-col gap-3">
-      <div className="glass-panel flex items-center justify-between px-4 py-2 shrink-0">
-        <div className="text-xs text-muted-foreground">
-          Weekly routine · check a block off to earn 3 credits
-        </div>
+      <div className="glass-panel flex items-center justify-between px-4 py-2.5 shrink-0">
+        <HudLabel accent="cyan">Routine Grid · +3 credits per block</HudLabel>
         <Button size="sm" onClick={newBlock}>
           <Plus className="size-4 mr-1" /> Block
         </Button>
       </div>
 
       <DndContext sensors={sensors} onDragEnd={onDragEnd}>
-        <div className="glass-panel flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="glass-panel relative flex min-h-0 flex-1 flex-col overflow-hidden">
+          <span className="pointer-events-none absolute left-0 top-0 z-20 size-2.5 border-l-2 border-t-2 border-[var(--holo-cyan)/70]" />
+          <span className="pointer-events-none absolute right-0 top-0 z-20 size-2.5 border-r-2 border-t-2 border-[var(--holo-cyan)/70]" />
+          <span className="pointer-events-none absolute bottom-0 left-0 z-20 size-2.5 border-b-2 border-l-2 border-[var(--holo-cyan)/70]" />
+          <span className="pointer-events-none absolute bottom-0 right-0 z-20 size-2.5 border-b-2 border-r-2 border-[var(--holo-cyan)/70]" />
           <div className="flex shrink-0 border-b border-border bg-background/60">
             <div className="w-16 shrink-0 border-r border-border" />
             {DAY_NAMES.map((name, i) => (
               <div
                 key={i}
                 className={cn(
-                  "flex-1 px-2 py-2 text-center border-r border-border last:border-r-0",
-                  i === todayIdx && "bg-primary/8",
+                  "relative flex-1 px-2 py-2 text-center border-r border-border last:border-r-0",
+                  i === todayIdx && "bg-[var(--holo-cyan)/6]",
                 )}
               >
-                <div className="text-[10px] text-muted-foreground">
+                <div
+                  className={cn(
+                    "font-mono text-[10px] tracking-widest uppercase",
+                    i === todayIdx ? "text-[var(--holo-cyan)]" : "text-muted-foreground",
+                  )}
+                >
                   {DAY_SHORT[i]}
                 </div>
                 <div
                   className={cn(
-                    "text-sm font-semibold",
-                    i === todayIdx && "text-primary",
+                    "text-sm font-bold",
+                    i === todayIdx ? "text-[var(--holo-cyan)]" : "text-foreground/80",
                   )}
                 >
                   {name}
                 </div>
+                {i === todayIdx && (
+                  <span className="absolute inset-x-1/2 -bottom-px size-1 -translate-x-1/2 rounded-full bg-[var(--holo-cyan)] shadow-[0_0_8px_2px_var(--holo-cyan)]" />
+                )}
               </div>
             ))}
           </div>
@@ -568,7 +585,7 @@ function BlockEditor({
           </div>
         </div>
         <div className="flex items-center justify-between pt-2">
-          <Button variant="ghost" size="sm" onClick={onDelete} className="text-[var(--neon-pink)]">
+          <Button variant="ghost" size="sm" onClick={onDelete} className="text-[var(--holo-pink)]">
             <Trash2 className="size-4 mr-1" /> Delete
           </Button>
           <div className="flex gap-2">

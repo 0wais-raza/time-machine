@@ -1,7 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useApp, todayStr, PRAYERS } from "@/lib/store";
-import { TopBar } from "./TopBar";
-import { Sidebar } from "./Sidebar";
+import { HolographicNavBar } from "./HolographicNavBar";
 import { VizierDrawer } from "./VizierDrawer";
 import { DashboardTab } from "./tabs/Dashboard";
 import { NamazTab } from "./tabs/Namaz";
@@ -195,12 +194,11 @@ export function AppShell() {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden">
-      <Sidebar />
       <div
         className="flex min-w-0 flex-1 flex-col transition-[margin] duration-300"
-        style={{ marginLeft: 240, marginRight: railWidth }}
+        style={{ marginRight: railWidth }}
       >
-        <TopBar />
+        <HolographicNavBar />
         <main className="scroll-y-clean flex-1 min-h-0 px-6 py-6">
           {activeTab === "dashboard" && <DashboardTab />}
           {activeTab === "namaz" && <NamazTab />}

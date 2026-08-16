@@ -1,5 +1,5 @@
-// Guarded service-worker registration wrapper. Lovable preview/dev contexts
-// must never register an app-shell service worker.
+// Guarded service-worker registration wrapper. Never register an app-shell
+// service worker in dev, inside an iframe, or when explicitly disabled.
 
 const APP_SW_PATH = "/sw.js";
 
@@ -7,12 +7,6 @@ function isRefusedContext(): boolean {
   if (typeof window === "undefined") return true;
   if (!import.meta.env.PROD) return true;
   if (window.top !== window.self) return true;
-
-  const host = window.location.hostname;
-  if (host.startsWith("id-preview--") || host.startsWith("preview--")) return true;
-  if (host === "lovableproject.com" || host.endsWith(".lovableproject.com")) return true;
-  if (host === "lovableproject-dev.com" || host.endsWith(".lovableproject-dev.com")) return true;
-  if (host === "beta.lovable.dev" || host.endsWith(".beta.lovable.dev")) return true;
 
   const params = new URLSearchParams(window.location.search);
   if (params.get("sw") === "off") return true;

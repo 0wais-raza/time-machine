@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { resolveConflicts } from "./scheduleConflict";
+import { partById } from "./hardware";
 
 export type Priority = "low" | "medium" | "high" | "critical";
 
@@ -143,10 +144,14 @@ interface AppState {
   /** Bonus payout already granted for a full 5/5 namaz day. */
   namazBonusPaid: Record<string, true>;
   awardCredits: (amount: number, date?: string) => void;
-  /** Hardware Armory: purchased part ids keyed by slot. */
+  /** Hardware Armory: purchased part ids (inventory). */
   ownedParts: string[];
   buyPart: (id: string, cost: number) => boolean;
   sellPart: (id: string, refund: number) => void;
+  /** Parts currently installed in the rig (one per slot). */
+  equippedParts: string[];
+  equipPart: (id: string) => void;
+  unequipPart: (id: string) => void;
 
   /** date(YYYY-MM-DD) -> blockIds completed that day. */
   completedBlocks: Record<string, string[]>;
@@ -202,8 +207,8 @@ interface AppState {
   notifiedMilestones: Record<string, number[]>;
   recordMilestone: (date: string, threshold: number) => void;
 
-  geminiKey: string;
-  setGeminiKey: (k: string) => void;
+  openrouterKey: string;
+  setOpenrouterKey: (k: string) => void;
 
   chat: ChatMessage[];
   pushChat: (m: ChatMessage) => void;
@@ -430,8 +435,24 @@ export const useApp = create<AppState>()(
       sellPart: (id, refund) =>
         set((s) => ({
           ownedParts: s.ownedParts.filter((x) => x !== id),
+          equippedParts: s.equippedParts.filter((x) => x !== id),
           credits: s.credits + refund,
         })),
+      equippedParts: [],
+      equipPart: (id) =>
+        set((s) => {
+          const part = partById(id);
+          if (!part || !s.ownedParts.includes(id) || s.equippedParts.includes(id)) return s;
+          // One part per slot: unequip any other part occupying the same slot.
+          const sameSlot = new Set(
+            s.equippedParts.filter((eid) => partById(eid)?.slot === part.slot),
+          );
+          return {
+            equippedParts: [...s.equippedParts.filter((eid) => !sameSlot.has(eid)), id],
+          };
+        }),
+      unequipPart: (id) =>
+        set((s) => ({ equippedParts: s.equippedParts.filter((x) => x !== id) })),
 
       completedBlocks: {},
       markBlockDone: (blockId, date) =>
@@ -624,8 +645,8 @@ export const useApp = create<AppState>()(
           };
         }),
 
-      geminiKey: "",
-      setGeminiKey: (k) => set({ geminiKey: k }),
+      openrouterKey: "",
+      setOpenrouterKey: (k) => set({ openrouterKey: k }),
 
       chat: [
         {
@@ -730,9 +751,26 @@ export const useApp = create<AppState>()(
     }),
     {
       name: "cybertime-machine-v1",
-      version: 6,
+      version: 8,
       migrate: (state: unknown) => {
         const s = (state ?? {}) as Record<string, unknown>;
+        // v7: OpenRouter key rename (client-side only, never committed).
+        if (typeof s.geminiKey === "string" && typeof s.openrouterKey !== "string") {
+          s.openrouterKey = s.geminiKey;
+        }
+        delete s.geminiKey;
+        // v8: split purchased inventory from equipped rig parts — existing owners
+        // get their first owned part per slot equipped automatically.
+        if (!Array.isArray(s.equippedParts)) {
+          const owned = Array.isArray(s.ownedParts) ? (s.ownedParts as string[]) : [];
+          const seen = new Set<string>();
+          s.equippedParts = owned.filter((id) => {
+            const p = partById(id);
+            if (!p || seen.has(p.slot)) return false;
+            seen.add(p.slot);
+            return true;
+          });
+        }
         if (typeof s.credits !== "number") s.credits = 0;
         if (!s.creditHistory || typeof s.creditHistory !== "object") s.creditHistory = {};
         if (!s.namazBonusPaid || typeof s.namazBonusPaid !== "object") s.namazBonusPaid = {};

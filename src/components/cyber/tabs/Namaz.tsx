@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, History as HistoryIcon, MapPin, RefreshCw } from "lucide-react";
+import { ChevronLeft, ChevronRight, History as HistoryIcon, MapPin, RefreshCw, Moon } from "lucide-react";
 import { useApp, PRAYERS, todayStr } from "@/lib/store";
 import { PanelHeader } from "../PanelHeader";
+import { HudLabel } from "../HudLabel";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
-import { to12h } from "@/lib/clock";
+import { to12h, useNow } from "@/lib/clock";
 import { fetchPrayerTimes, requestGeo } from "@/lib/prayerTimes";
 import { toast } from "sonner";
 
@@ -42,6 +43,8 @@ export function NamazTab() {
   const dayPrayers = prayers[selectedDate] ?? {};
   const hijri = useMemo(() => toHijri(new Date(selectedDate)), [selectedDate]);
   const liveTimes = prayerTimes[selectedDate] ?? {};
+  const now = useNow(1000);
+  const today = todayStr();
 
   const days = useMemo(() => {
     const arr: string[] = [];
@@ -90,54 +93,138 @@ export function NamazTab() {
     d.setDate(d.getDate() + n);
     setSelectedDate(d.toISOString().slice(0, 10));
   };
-  const isToday = selectedDate === todayStr();
-  const isPast = selectedDate < todayStr();
+  const isToday = selectedDate === today;
+  const isPast = selectedDate < today;
   const locked = isPast && !editPast;
+
+  const doneCount = PRAYERS.filter((p) => dayPrayers[p.name]).length;
+
+  // Live next-prayer beacon (only meaningful for today).
+  const nextPrayer = useMemo(() => {
+    if (!now || selectedDate !== today) return null;
+    const mins = now.getHours() * 60 + now.getMinutes();
+    for (const p of PRAYERS) {
+      const t = liveTimes[p.name] ?? p.time;
+      const [h, m] = t.split(":").map(Number);
+      if (h * 60 + m > mins) return { name: p.name, time: t };
+    }
+    const first = PRAYERS[0];
+    const t = liveTimes[first.name] ?? first.time;
+    return { name: first.name, time: t, tomorrow: true };
+  }, [now, liveTimes, selectedDate, today]);
+
+  const nextCountdown = useMemo(() => {
+    if (!now || !nextPrayer) return null;
+    const [h, m] = nextPrayer.time.split(":").map(Number);
+    const target = new Date(now);
+    target.setHours(h, m, 0, 0);
+    if (nextPrayer.tomorrow) target.setDate(target.getDate() + 1);
+    const diff = Math.max(0, Math.round((target.getTime() - now.getTime()) / 1000));
+    const hh = Math.floor(diff / 3600);
+    const mm = Math.floor((diff % 3600) / 60);
+    const ss = diff % 60;
+    return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")}`;
+  }, [now, nextPrayer]);
+
+  const greg = selectedDate
+    ? new Date(selectedDate + "T12:00:00").toLocaleDateString("en-US", {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      })
+    : "";
 
   return (
     <div>
       <PanelHeader
-        eyebrow="Tab 02 / Spiritual Focus"
+        eyebrow="Spiritual Focus"
         title="Namaz Discipline"
         subtitle="Five pillars. Zero compromise."
       />
 
-      <div className="glass-panel mb-4 flex flex-wrap items-center justify-between gap-3 px-5 py-4">
-        <div>
-          <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
-            Hijri Date
+      {/* Hero — Hijri clock + live countdown + cycle ring */}
+      <div className="glass-panel cyber-grid relative mb-4 overflow-hidden p-5">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[oklch(0.85_0.17_200/0.5)] to-transparent" />
+        <div className="relative grid gap-5 md:grid-cols-3">
+          {/* Hijri */}
+          <div>
+            <HudLabel accent="cyan" className="mb-2">Hijri Date</HudLabel>
+            <div className="text-3xl font-bold tracking-tight">{hijri.day} {hijri.month}</div>
+            <div className="font-mono text-sm text-[var(--holo-cyan)]">{hijri.year} AH</div>
+            <div className="mt-1.5 text-[11px] uppercase tracking-[0.2em] text-muted-foreground">{greg}</div>
           </div>
-          <div className="text-2xl font-bold neon-text">
-            {hijri.day} {hijri.month} {hijri.year} AH
+          {/* Live countdown */}
+          <div className="flex flex-col justify-center md:border-l md:border-[oklch(1_1_1/0.07)] md:pl-5">
+            <HudLabel accent="green" className="mb-2">
+              {nextPrayer?.tomorrow ? "Next (tomorrow)" : "Next Prayer"}
+            </HudLabel>
+            <div className="flex items-baseline gap-3">
+              <span className="text-2xl font-bold">{nextPrayer?.name ?? PRAYERS[0].name}</span>
+              <span className="font-mono text-sm text-muted-foreground">
+                {nextPrayer ? to12h(nextPrayer.time) : ""}
+              </span>
+            </div>
+            <div
+              className="mt-1 font-mono-tech text-4xl font-bold tabular-nums text-[var(--holo-green)]"
+              suppressHydrationWarning
+            >
+              {nextCountdown ?? "--:--:--"}
+            </div>
+            <div className="mt-1.5 flex items-center gap-2 font-mono text-[9px] uppercase tracking-[0.25em] text-muted-foreground/70">
+              <span className="led-dot size-1.5" style={{ color: "var(--holo-green)" }} />
+              {now?.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} local time
+            </div>
+          </div>
+          {/* Cycle ring */}
+          <div className="flex flex-col items-center justify-center gap-2 md:border-l md:border-[oklch(1_1_1/0.07)] md:pl-5">
+            <div className="flex items-center gap-3">
+              {PRAYERS.map((p) => {
+                const done = !!dayPrayers[p.name];
+                const isNext = nextPrayer?.name === p.name;
+                return (
+                  <div key={p.name} className="flex flex-col items-center gap-1.5">
+                    <span
+                      className={cn(
+                        "relative size-7 rounded-full border transition-all",
+                        done
+                          ? "border-[var(--holo-green)] bg-[oklch(0.8_0.16_155/0.15)] shadow-[0_0_10px_oklch(0.8_0.16_155/0.4)]"
+                          : isNext
+                            ? "border-[var(--holo-cyan)] bg-[oklch(0.85_0.17_200/0.12)]"
+                            : "border-[oklch(1_1_1/0.12)] bg-[oklch(1_1_1/0.03)]",
+                      )}
+                    >
+                      {isNext && (
+                        <span className="pointer-events-none absolute -inset-[3px] animate-[holo-spin_3s_linear_infinite] rounded-full border border-dashed border-[oklch(0.85_0.17_200/0.6)]" />
+                      )}
+                      {done && <span className="absolute inset-0 flex items-center justify-center text-[10px] text-[var(--holo-green)]">✓</span>}
+                    </span>
+                    <span className={cn("font-mono text-[8px] uppercase tracking-wider", done ? "text-[var(--holo-green)]" : isNext ? "text-[var(--holo-cyan)]" : "text-muted-foreground/60")}>
+                      {p.name}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+              Cycle {doneCount}/5 {doneCount === 5 && "· +5 CR bonus ✓"}
+            </div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {coords ? (
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => loadTimes(selectedDate, coords)}
-              disabled={loading}
-              title="Refresh times"
-              className="text-[11px]"
-            >
-              <RefreshCw className={cn("size-3.5 mr-1", loading && "animate-spin")} />
-              {coords.lat.toFixed(2)}, {coords.lon.toFixed(2)}
-            </Button>
-          ) : (
-            <Button size="sm" variant="secondary" onClick={enableGeo} className="text-[11px]">
-              <MapPin className="size-3.5 mr-1" /> Enable live times
-            </Button>
-          )}
+      </div>
+
+      {/* Day controls */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[oklch(1_1_1/0.06)] bg-[oklch(1_1_1/0.02)] px-4 py-2.5">
+        <div className="flex items-center gap-1.5">
           <Button size="icon" variant="ghost" onClick={() => shiftDate(-1)} title="Previous day">
             <ChevronLeft className="size-4" />
           </Button>
           <input
             type="date"
             value={selectedDate}
-            max={todayStr()}
+            max={today}
             onChange={(e) => setSelectedDate(e.target.value)}
-            className="bg-background/60 border border-border rounded px-2 py-1 text-xs font-mono"
+            className="rounded border border-border bg-background/60 px-2 py-1 font-mono text-xs"
           />
           <Button
             size="icon"
@@ -160,88 +247,109 @@ export function NamazTab() {
             </Button>
           )}
         </div>
+        <div className="flex items-center gap-2">
+          {coords ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => loadTimes(selectedDate, coords)}
+              disabled={loading}
+              title="Refresh times"
+              className="text-[11px]"
+            >
+              <RefreshCw className={cn("size-3.5 mr-1", loading && "animate-spin")} />
+              {coords.lat.toFixed(2)}, {coords.lon.toFixed(2)}
+            </Button>
+          ) : (
+            <Button size="sm" variant="secondary" onClick={enableGeo} className="text-[11px]">
+              <MapPin className="size-3.5 mr-1" /> Enable live times
+            </Button>
+          )}
+        </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="glass-panel p-5">
-          <h3 className="mb-4 text-sm font-bold uppercase tracking-widest">
-            Today's Tracking
-          </h3>
-          <ul className="space-y-3">
-            {PRAYERS.map((p) => {
-              const done = !!dayPrayers[p.name];
-              const t = liveTimes[p.name] ?? p.time;
-              return (
-                <li
-                  key={p.name}
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg border px-4 py-3 transition",
-                    done
-                      ? "border-[var(--neon-cyan)]/40 bg-[oklch(0.85_0.2_200_/_0.08)]"
-                      : "border-border bg-background/40",
-                  )}
-                >
-                  <Checkbox
-                    checked={done}
-                    disabled={locked}
-                    onCheckedChange={() => togglePrayer(selectedDate, p.name)}
-                  />
-                  <div className="flex-1">
-                    <div className="font-bold">{p.name}</div>
-                    <div className="font-mono text-xs text-muted-foreground">
-                      {to12h(t)}
-                      {liveTimes[p.name] && (
-                        <span className="ml-1 text-[9px] uppercase tracking-widest text-[var(--neon-cyan)]">live</span>
-                      )}
-                    </div>
-                  </div>
-                  {done && (
-                    <span className="text-[10px] uppercase tracking-widest text-[var(--neon-cyan)]">
-                      Logged
-                    </span>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
+      {/* Prayer cards */}
+      <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        {PRAYERS.map((p) => {
+          const done = !!dayPrayers[p.name];
+          const isNext = nextPrayer?.name === p.name;
+          const t = liveTimes[p.name] ?? p.time;
+          return (
+            <button
+              key={p.name}
+              onClick={() => !locked && togglePrayer(selectedDate, p.name)}
+              className={cn(
+                "glass-panel relative flex flex-col items-center gap-2 overflow-hidden p-4 text-center transition-all hover:-translate-y-0.5",
+                done
+                  ? "border-[oklch(0.8_0.16_155/0.45)] shadow-[0_0_22px_oklch(0.8_0.16_155/0.15)]"
+                  : isNext
+                    ? "border-[oklch(0.85_0.17_200/0.5)] shadow-[0_0_22px_oklch(0.85_0.17_200/0.2)]"
+                    : "hover:border-[oklch(0.85_0.17_200/0.3)]",
+              )}
+            >
+              {isNext && (
+                <span className="pointer-events-none absolute -inset-[2px] animate-[holo-spin_4s_linear_infinite] rounded-[inherit] border border-dashed border-[oklch(0.85_0.17_200/0.45)]" />
+              )}
+              <Moon className={cn("size-5", done ? "text-[var(--holo-green)]" : isNext ? "text-[var(--holo-cyan)]" : "text-muted-foreground/60")} />
+              <div className="text-sm font-bold">{p.name}</div>
+              <div className="font-mono text-xs text-muted-foreground">
+                {to12h(t)}
+                {liveTimes[p.name] && (
+                  <span className="ml-1 text-[8px] uppercase tracking-widest text-[var(--holo-cyan)]">live</span>
+                )}
+              </div>
+              <div
+                className={cn(
+                  "mt-auto flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[9px] uppercase tracking-[0.2em] transition",
+                  done
+                    ? "border-[oklch(0.8_0.16_155/0.4)] bg-[oklch(0.8_0.16_155/0.1)] text-[var(--holo-green)]"
+                    : isNext
+                      ? "border-[oklch(0.85_0.17_200/0.4)] bg-[oklch(0.85_0.17_200/0.1)] text-[var(--holo-cyan)]"
+                      : "border-border text-muted-foreground/70",
+                )}
+              >
+                {done ? "Logged ✓" : isNext ? "Next" : locked ? "Locked" : "Pending"}
+              </div>
+            </button>
+          );
+        })}
+      </div>
 
-        <div className="glass-panel p-5">
-          <h3 className="mb-4 text-sm font-bold uppercase tracking-widest">
-            14-Day History
-          </h3>
-          <div className="grid grid-cols-7 gap-2">
-            {days.map((d) => {
-              const count = PRAYERS.filter((p) => prayers[d]?.[p.name]).length;
-              const isSel = d === selectedDate;
-              return (
-                <button
-                  key={d}
-                  onClick={() => setSelectedDate(d)}
+      {/* History */}
+      <div className="glass-panel p-5">
+        <HudLabel accent="violet" className="mb-4">14-Day History</HudLabel>
+        <div className="grid grid-cols-7 gap-2">
+          {days.map((d) => {
+            const count = PRAYERS.filter((p) => prayers[d]?.[p.name]).length;
+            const isSel = d === selectedDate;
+            return (
+              <button
+                key={d}
+                onClick={() => setSelectedDate(d)}
+                className={cn(
+                  "aspect-square rounded-md border text-xs flex flex-col items-center justify-center transition",
+                  isSel
+                    ? "border-[var(--holo-cyan)] bg-[oklch(0.85_0.17_200/0.12)] shadow-[0_0_12px_oklch(0.85_0.17_200/0.25)]"
+                    : "border-[oklch(1_1_1/0.07)] hover:border-muted-foreground",
+                  count === 5 && !isSel && "border-[oklch(0.8_0.16_155/0.35)]",
+                )}
+              >
+                <span className="font-bold">{new Date(d).getDate()}</span>
+                <span
                   className={cn(
-                    "aspect-square rounded-md border text-xs flex flex-col items-center justify-center transition",
-                    isSel
-                      ? "border-[var(--neon-cyan)] bg-[oklch(0.85_0.2_200_/_0.15)]"
-                      : "border-border hover:border-muted-foreground",
+                    "mt-0.5 font-mono text-[10px]",
+                    count === 5 ? "text-[var(--holo-green)]" : "text-muted-foreground",
                   )}
                 >
-                  <span className="font-bold">{new Date(d).getDate()}</span>
-                  <span
-                    className={cn(
-                      "mt-0.5 font-mono text-[10px]",
-                      count === 5 ? "text-[var(--neon-cyan)]" : "text-muted-foreground",
-                    )}
-                  >
-                    {count}/5
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-          <p className="mt-4 text-xs text-muted-foreground">
-            Select any day to edit or fill missed prayers.
-          </p>
+                  {count}/5
+                </span>
+              </button>
+            );
+          })}
         </div>
+        <p className="mt-4 text-xs text-muted-foreground">
+          Select any day to edit or fill missed prayers.
+        </p>
       </div>
     </div>
   );
