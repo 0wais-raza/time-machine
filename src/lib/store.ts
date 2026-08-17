@@ -51,12 +51,7 @@ export type PrayerLog = Record<string, Partial<Record<PrayerName, boolean>>>; //
 /** Per-day prayer time overrides fetched from API: date(YYYY-MM-DD) -> name -> "HH:mm". */
 export type PrayerTimes = Record<string, Partial<Record<PrayerName, string>>>;
 
-export type NotificationKind =
-  | "milestone"
-  | "deadline"
-  | "block"
-  | "prayer"
-  | "system";
+export type NotificationKind = "milestone" | "deadline" | "block" | "prayer" | "system";
 
 export interface AppNotification {
   id: string;
@@ -83,14 +78,7 @@ export interface ChatSession {
 }
 
 export type TabKey =
-  | "dashboard"
-  | "namaz"
-  | "todo"
-  | "schedule"
-  | "analytics"
-  | "workbench"
-  | "vizier"
-  | "settings";
+  "dashboard" | "namaz" | "todo" | "schedule" | "analytics" | "workbench" | "vizier" | "settings";
 
 export interface UserProfile {
   name: string;
@@ -191,6 +179,11 @@ interface AppState {
   prayerTimes: PrayerTimes;
   setDayPrayerTimes: (date: string, map: Partial<Record<PrayerName, string>>) => void;
 
+  /** Manual per-prayer time overrides — apply to every day until cleared. */
+  customPrayerTimes: Partial<Record<PrayerName, string>>;
+  setCustomPrayerTime: (name: PrayerName, time: string) => void;
+  clearCustomPrayerTimes: () => void;
+
   coords: GeoCoords | null;
   setCoords: (c: GeoCoords | null) => void;
 
@@ -237,8 +230,10 @@ export const TASK_CREDITS: Record<Priority, number> = {
 };
 /** Credits awarded when a schedule block is checked off. */
 export const BLOCK_CREDITS = 3;
-/** Bonus payout for logging all five daily prayers. */
-export const NAMAZ_BONUS_CREDITS = 5;
+/** Credits awarded per prayer logged. */
+export const PRAYER_CREDITS = 1;
+/** Bonus payout for completing all five daily prayers. */
+export const NAMAZ_BONUS_CREDITS = 10;
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 const today = () => new Date().toISOString().slice(0, 10);
@@ -321,8 +316,7 @@ export const useApp = create<AppState>()(
           }
           return { tasks, credits, creditHistory };
         }),
-      removeTask: (id) =>
-        set((s) => ({ tasks: s.tasks.filter((x) => x.id !== id) })),
+      removeTask: (id) => set((s) => ({ tasks: s.tasks.filter((x) => x.id !== id) })),
       updateTask: (id, patch) =>
         set((s) => ({
           tasks: s.tasks.map((x) => (x.id === id ? { ...x, ...patch } : x)),
@@ -358,14 +352,12 @@ export const useApp = create<AppState>()(
       resolveAndAddBlock: (b) => {
         const id = uid();
         set((s) => {
-          const dow =
-            typeof b.dayOfWeek === "number"
-              ? b.dayOfWeek
-              : new Date(b.date).getDay();
-          const { deleteIds, updates, splitAdditions } = resolveConflicts(
-            s.blocks,
-            { start: b.start, end: b.end, dayOfWeek: dow },
-          );
+          const dow = typeof b.dayOfWeek === "number" ? b.dayOfWeek : new Date(b.date).getDay();
+          const { deleteIds, updates, splitAdditions } = resolveConflicts(s.blocks, {
+            start: b.start,
+            end: b.end,
+            dayOfWeek: dow,
+          });
           const delSet = new Set(deleteIds);
           const nextBlocks: ScheduleBlock[] = s.blocks
             .filter((x) => !delSet.has(x.id))
@@ -378,8 +370,7 @@ export const useApp = create<AppState>()(
         });
         return id;
       },
-      removeBlock: (id) =>
-        set((s) => ({ blocks: s.blocks.filter((x) => x.id !== id) })),
+      removeBlock: (id) => set((s) => ({ blocks: s.blocks.filter((x) => x.id !== id) })),
       updateBlock: (id, patch) =>
         set((s) => ({
           blocks: s.blocks.map((x) => (x.id === id ? { ...x, ...patch } : x)),
@@ -389,21 +380,52 @@ export const useApp = create<AppState>()(
       togglePrayer: (date, name) =>
         set((s) => {
           const day = { ...(s.prayers[date] ?? {}) };
-          day[name] = !day[name];
+          const wasOn = !!day[name];
+          day[name] = !wasOn;
           const prayers = { ...s.prayers, [date]: day };
           const complete = PRAYERS.every((p) => day[p.name]);
-          if (complete && !s.namazBonusPaid[date]) {
-            return {
-              prayers,
-              credits: s.credits + NAMAZ_BONUS_CREDITS,
-              creditHistory: {
-                ...s.creditHistory,
-                [date]: (s.creditHistory[date] ?? 0) + NAMAZ_BONUS_CREDITS,
-              },
-              namazBonusPaid: { ...s.namazBonusPaid, [date]: true as const },
+
+          let credits = s.credits;
+          let creditHistory = s.creditHistory;
+          let namazBonusPaid = s.namazBonusPaid;
+          const today = date;
+
+          // Per-prayer credit: +1 when logging, -1 when unlogging.
+          if (!wasOn) {
+            credits += PRAYER_CREDITS;
+            creditHistory = {
+              ...creditHistory,
+              [today]: (creditHistory[today] ?? 0) + PRAYER_CREDITS,
             };
+          } else {
+            credits = Math.max(0, credits - PRAYER_CREDITS);
+            creditHistory = {
+              ...creditHistory,
+              [today]: Math.max(0, (creditHistory[today] ?? 0) - PRAYER_CREDITS),
+            };
+            // Day was fully complete — claw the cycle bonus back.
+            if (namazBonusPaid[today]) {
+              credits = Math.max(0, credits - NAMAZ_BONUS_CREDITS);
+              creditHistory = {
+                ...creditHistory,
+                [today]: Math.max(0, (creditHistory[today] ?? 0) - NAMAZ_BONUS_CREDITS),
+              };
+              namazBonusPaid = { ...namazBonusPaid };
+              delete namazBonusPaid[today];
+            }
           }
-          return { prayers };
+
+          // Cycle complete → one-time +10 bonus.
+          if (complete && !namazBonusPaid[today]) {
+            credits += NAMAZ_BONUS_CREDITS;
+            creditHistory = {
+              ...creditHistory,
+              [today]: (creditHistory[today] ?? 0) + NAMAZ_BONUS_CREDITS,
+            };
+            namazBonusPaid = { ...namazBonusPaid, [today]: true as const };
+          }
+
+          return { prayers, credits, creditHistory, namazBonusPaid };
         }),
 
       credits: 0,
@@ -446,8 +468,7 @@ export const useApp = create<AppState>()(
             equippedParts: [...s.equippedParts.filter((eid) => !sameSlot.has(eid)), id],
           };
         }),
-      unequipPart: (id) =>
-        set((s) => ({ equippedParts: s.equippedParts.filter((x) => x !== id) })),
+      unequipPart: (id) => set((s) => ({ equippedParts: s.equippedParts.filter((x) => x !== id) })),
 
       completedBlocks: {},
       markBlockDone: (blockId, date) =>
@@ -599,6 +620,16 @@ export const useApp = create<AppState>()(
           },
         })),
 
+      customPrayerTimes: {},
+      setCustomPrayerTime: (name, time) =>
+        set((s) => ({
+          customPrayerTimes: {
+            ...s.customPrayerTimes,
+            [name]: time || undefined,
+          },
+        })),
+      clearCustomPrayerTimes: () => set({ customPrayerTimes: {} }),
+
       // Default to Karachi, PK until the operator enables live geolocation.
       coords: { lat: 24.8607, lon: 67.0011 },
       setCoords: (c) => set({ coords: c }),
@@ -620,9 +651,7 @@ export const useApp = create<AppState>()(
       clearNotifications: () => set({ notifications: [] }),
       dispatched: {},
       markDispatched: (key) =>
-        set((s) =>
-          s.dispatched[key] ? s : { dispatched: { ...s.dispatched, [key]: true } },
-        ),
+        set((s) => (s.dispatched[key] ? s : { dispatched: { ...s.dispatched, [key]: true } })),
 
       bootGreetedSession: null,
       markBootGreeted: (sessionId) => set({ bootGreetedSession: sessionId }),
@@ -698,8 +727,7 @@ export const useApp = create<AppState>()(
       deleteSession: (id) =>
         set((s) => {
           const rest = s.sessions.filter((x) => x.id !== id);
-          const active =
-            s.activeSessionId === id ? rest[0]?.id ?? "" : s.activeSessionId;
+          const active = s.activeSessionId === id ? (rest[0]?.id ?? "") : s.activeSessionId;
           return { sessions: rest, activeSessionId: active };
         }),
       selectSession: (id) => set({ activeSessionId: id }),
@@ -768,14 +796,22 @@ export const useApp = create<AppState>()(
           s.tasks = (s.tasks as Record<string, unknown>[]).map(({ xp: _xp, ...t }) => t);
         }
         if (!s.settings || typeof s.settings !== "object") {
-          s.settings = { notificationFrequency: "critical", aiDepth: "fast", aiModel: "openrouter/auto" };
+          s.settings = {
+            notificationFrequency: "critical",
+            aiDepth: "fast",
+            aiModel: "openrouter/auto",
+          };
         } else {
           const cur = s.settings as Record<string, unknown>;
-          if (!cur.aiModel || cur.aiModel === "google/gemini-pro-1.5") cur.aiModel = "openrouter/auto";
+          if (!cur.aiModel || cur.aiModel === "google/gemini-pro-1.5")
+            cur.aiModel = "openrouter/auto";
         }
         delete s.pomodoro;
         if (!s.prayerTimes) s.prayerTimes = {};
         if (s.coords === undefined) s.coords = null;
+        if (!s.customPrayerTimes || typeof s.customPrayerTimes !== "object") {
+          s.customPrayerTimes = {};
+        }
         if (!Array.isArray(s.notifications)) s.notifications = [];
         if (!s.dispatched) s.dispatched = {};
         // Migrate ScheduleBlocks: add dayOfWeek derived from date.

@@ -15,6 +15,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { to12h, useNow } from "@/lib/clock";
 import { fetchPrayerTimes, requestGeo } from "@/lib/prayerTimes";
+import { resolveDayTimes } from "@/lib/prayerResolve";
 import { toast } from "sonner";
 
 // Approximate Hijri conversion (Umm al-Qura algorithm approximation)
@@ -52,13 +53,21 @@ function toHijri(date: Date): { day: number; month: string; year: number } {
 }
 
 export function NamazTab() {
-  const { prayers, togglePrayer, prayerTimes, setDayPrayerTimes, coords, setCoords } = useApp();
+  const {
+    prayers,
+    togglePrayer,
+    prayerTimes,
+    customPrayerTimes,
+    setDayPrayerTimes,
+    coords,
+    setCoords,
+  } = useApp();
   const [selectedDate, setSelectedDate] = useState(todayStr());
   const [editPast, setEditPast] = useState(false);
   const [loading, setLoading] = useState(false);
   const dayPrayers = prayers[selectedDate] ?? {};
   const hijri = useMemo(() => toHijri(new Date(selectedDate)), [selectedDate]);
-  const liveTimes = prayerTimes[selectedDate] ?? {};
+  const liveTimes = resolveDayTimes(prayerTimes, customPrayerTimes, selectedDate);
   const now = useNow(1000);
   const today = todayStr();
 
@@ -242,7 +251,8 @@ export function NamazTab() {
               })}
             </div>
             <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-              Cycle {doneCount}/5 {doneCount === 5 && "· +5 CR bonus ✓"}
+              Cycle {doneCount}/5 · +1 CR each
+              {doneCount === 5 && <span className="text-[var(--holo-green)]"> · +10 bonus ✓</span>}
             </div>
           </div>
         </div>

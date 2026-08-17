@@ -417,9 +417,36 @@ function Storage({ equipped }: { equipped: Set<PartSlot> }) {
 }
 
 /* ============================================================
+ * Case themes — the equipped case product changes the tower's look
+ * (white / glass-heavy / walnut) so the rig matches the real part.
+ * ============================================================ */
+interface CaseTheme {
+  frame: string;
+  dark: string;
+  accent: string;
+  glassOpacity: number;
+}
+
+const DEFAULT_CASE_THEME: CaseTheme = {
+  frame: "#1d242e",
+  dark: "#161b22",
+  accent: "#232b34",
+  glassOpacity: 0.22,
+};
+
+const CASE_THEMES: Record<string, CaseTheme> = {
+  "case-o11": { frame: "#1d242e", dark: "#161b22", accent: "#232b34", glassOpacity: 0.3 },
+  "case-o11v": { frame: "#20262e", dark: "#181d24", accent: "#262d36", glassOpacity: 0.36 },
+  "case-h9": { frame: "#e8eaee", dark: "#c9cdd4", accent: "#f2f4f7", glassOpacity: 0.32 },
+  "case-y70": { frame: "#e8eaee", dark: "#c9cdd4", accent: "#f2f4f7", glassOpacity: 0.32 },
+  "case-6500x": { frame: "#1d242e", dark: "#161b22", accent: "#232b34", glassOpacity: 0.34 },
+  "case-mid": { frame: "#262019", dark: "#1b1610", accent: "#2e261c", glassOpacity: 0.2 },
+};
+
+/* ============================================================
  * Tower chassis — tempered glass side, mesh front, PSU shroud
  * ============================================================ */
-function Chassis({ equipped }: { equipped: Set<PartSlot> }) {
+function Chassis({ equipped, theme }: { equipped: Set<PartSlot>; theme: CaseTheme }) {
   const powered = equipped.has("psu");
   const W = 3.0; // x
   const H = 3.3; // y
@@ -428,32 +455,58 @@ function Chassis({ equipped }: { equipped: Set<PartSlot> }) {
   const hd = D / 2;
   const hh = H / 2;
 
+  // Theme-aware materials (memoized per theme).
+  const mats = useMemo(() => {
+    return {
+      frame: () =>
+        new THREE.MeshStandardMaterial({ color: theme.frame, roughness: 0.62, metalness: 0.35 }),
+      dark: () =>
+        new THREE.MeshStandardMaterial({ color: theme.dark, roughness: 0.7, metalness: 0.3 }),
+      accent: () =>
+        new THREE.MeshStandardMaterial({ color: theme.accent, roughness: 0.55, metalness: 0.5 }),
+      glass: () =>
+        new THREE.MeshStandardMaterial({
+          color: theme.frame === "#e8eaee" ? "#dfe4ea" : GLASS,
+          roughness: 0.12,
+          metalness: 0.85,
+          transparent: true,
+          opacity: theme.glassOpacity,
+          depthWrite: false,
+          envMapIntensity: 1.2,
+        }),
+    };
+  }, [theme]);
+
   return (
     <group>
       {/* left solid panel */}
-      <Box position={[-hw, 0, 0]} size={[0.06, H, D]} mat={m.casePanel} />
+      <Box position={[-hw, 0, 0]} size={[0.06, H, D]} mat={mats.frame} />
       {/* right tempered glass */}
-      <Box position={[hw, 0, 0]} size={[0.045, H, D]} mat={m.glass} />
+      <Box position={[hw, 0, 0]} size={[0.045, H, D]} mat={mats.glass} />
       {/* back panel */}
-      <Box position={[0, 0, -hd]} size={[W, H, 0.06]} mat={m.caseDark} />
+      <Box position={[0, 0, -hd]} size={[W, H, 0.06]} mat={mats.dark} />
       {/* back IO shield */}
       <Box position={[0, hh - 0.62, -hd - 0.02]} size={[1.4, 0.18, 0.05]} mat={m.steelDark} />
       {/* top panel */}
-      <Box position={[0, hh, 0]} size={[W, 0.06, D]} mat={m.casePanel} />
+      <Box position={[0, hh, 0]} size={[W, 0.06, D]} mat={mats.frame} />
       {/* bottom panel */}
-      <Box position={[0, -hh, 0]} size={[W, 0.06, D]} mat={m.caseDark} />
+      <Box position={[0, -hh, 0]} size={[W, 0.06, D]} mat={mats.dark} />
       {/* front panel frame (mesh look = dark with fan holes visible) */}
-      <Box position={[0, 0, hd]} size={[W, H, 0.07]} mat={m.caseDark} />
-      {/* front glass strip (top half) */}
-      <Box position={[0, 0.55, hd + 0.02]} size={[W - 0.5, 1.1, 0.02]} mat={m.glass} />
+      <Box position={[0, 0, hd]} size={[W, H, 0.07]} mat={mats.dark} />
+      {/* front glass strip — glass cases get a full glass front */}
+      <Box
+        position={[0, 0.55, hd + 0.02]}
+        size={[W - 0.5, theme.glassOpacity > 0.28 ? 2.3 : 1.1, 0.02]}
+        mat={mats.glass}
+      />
 
       {/* PSU shroud — separates bottom chamber */}
-      <Box position={[0, -0.62, 0]} size={[W - 0.24, 0.06, D - 0.1]} mat={m.accent} />
+      <Box position={[0, -0.62, 0]} size={[W - 0.24, 0.06, D - 0.1]} mat={mats.accent} />
       {/* shroud opening for GPU cables */}
       <Box position={[-0.55, -0.56, 0.15]} size={[0.5, 0.12, 0.3]} mat={m.black} />
 
       {/* interior spine behind motherboard */}
-      <Box position={[-0.52, 0, -0.45]} size={[2.5, H - 1.6, 0.05]} mat={m.casePanel} />
+      <Box position={[-0.52, 0, -0.45]} size={[2.5, H - 1.6, 0.05]} mat={mats.frame} />
 
       {/* front intake fans behind mesh */}
       {[-0.85, 0, 0.85].map((x) => (
@@ -643,15 +696,24 @@ function ProductTags({
 function CaseLight({ equipped }: { equipped: Set<PartSlot> }) {
   const ref = useRef<THREE.PointLight>(null);
   const powered = equipped.has("psu");
+  const rgb = equipped.has("lighting");
   useFrame((state) => {
     if (!ref.current) return;
-    if (!powered) {
+    if (!powered && !rgb) {
       ref.current.intensity = 0;
       return;
     }
-    ref.current.intensity = 3 + Math.sin(state.clock.elapsedTime * 2.2) * 0.6;
+    // RGB lighting slot drives a colored interior glow even without a PSU;
+    // the PSU adds a cold white fill on top.
+    const breathe = Math.sin(state.clock.elapsedTime * 2.2) * 0.5;
+    ref.current.intensity = (rgb ? 2.6 : 0) + (powered ? 1.6 : 0) + breathe * (rgb ? 0.7 : 0.3);
+    if (rgb) {
+      ref.current.color.setHSL((state.clock.elapsedTime * 0.15) % 1, 0.9, 0.55);
+    } else {
+      ref.current.color.set("#8fe8ff");
+    }
   });
-  return <pointLight ref={ref} position={[0, 0.2, 0.3]} color="#8fe8ff" distance={5} decay={2} />;
+  return <pointLight ref={ref} position={[0, 0.2, 0.3]} distance={5.5} decay={2} />;
 }
 
 /* ============================================================
@@ -665,6 +727,9 @@ function Rig({
   tags: { id: string; slot: PartSlot; name: string; brand: string }[];
 }) {
   const { scene, gl } = useThree();
+  // Equipped case product changes the tower's real look.
+  const caseTag = tags.find((t) => t.slot === "case");
+  const caseTheme = (caseTag && CASE_THEMES[caseTag.id]) || DEFAULT_CASE_THEME;
   // Baked environment reflections — metals & glass read as real materials.
   useEffect(() => {
     const pmrem = new THREE.PMREMGenerator(gl);
@@ -687,7 +752,7 @@ function Rig({
       <DeskAndFloor />
       {/* tower sits on the desk (desk top at y≈0.23, feet bottom at 0.23) */}
       <group position={[0, 1.91, 0]}>
-        <Chassis equipped={equipped} />
+        <Chassis equipped={equipped} theme={caseTheme} />
         <Motherboard equipped={equipped} />
         <Gpu equipped={equipped} />
         <Psu equipped={equipped} />

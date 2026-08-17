@@ -86,7 +86,7 @@ export function JarvisClock({ size = 360 }: { size?: number }) {
 
   const h24 = now?.getHours() ?? 0;
   const ampm = now ? (h24 >= 12 ? "PM" : "AM") : "--";
-  const h12 = now ? (h24 % 12 || 12) : 0;
+  const h12 = now ? h24 % 12 || 12 : 0;
   const hh = now ? pad(h12) : "--";
   const mm = now ? pad(now.getMinutes()) : "--";
   const ss = now ? pad(now.getSeconds()) : "--";
@@ -269,23 +269,26 @@ export function JarvisClock({ size = 360 }: { size?: number }) {
           {dateLine}
         </div>
 
-        {/* next block / active block chip */}
+        {/* slim status line — no box, keeps the dial clean */}
         {countdown ? (
-          <div className="mt-3 flex items-center gap-2 rounded-md border border-[oklch(0.85_0.17_200/0.3)] bg-[oklch(0.85_0.17_200/0.08)] px-2.5 py-1.5">
-            <span className="led-dot size-1.5" style={{ color: "var(--holo-cyan)" }} />
-            <span className="max-w-[130px] truncate font-mono text-[8.5px] uppercase tracking-[0.18em] text-muted-foreground">
+          <div className="mt-3 flex items-center justify-center gap-1.5">
+            <span className="led-dot size-1" style={{ color: "var(--holo-cyan)" }} />
+            <span className="max-w-[150px] truncate font-mono text-[8.5px] uppercase tracking-[0.16em] text-muted-foreground/80">
               {(active ?? next)?.title}
             </span>
             <span
-              className="font-mono-tech text-[12px] font-bold tabular-nums text-[var(--holo-cyan)]"
+              className="font-mono-tech text-[10px] font-bold tabular-nums text-[var(--holo-cyan)]"
               suppressHydrationWarning
             >
               {pad(countdown.hh)}:{pad(countdown.mm)}:{pad(countdown.ss)}
             </span>
           </div>
         ) : (
-          <div className="mt-3 rounded-md border border-[oklch(0.8_0.16_155/0.25)] bg-[oklch(0.8_0.16_155/0.07)] px-2.5 py-1.5 font-mono text-[8.5px] uppercase tracking-[0.2em] text-[var(--holo-green)]">
-            Open territory — no blocks scheduled
+          <div className="mt-3 flex items-center justify-center gap-1.5">
+            <span className="led-dot size-1" style={{ color: "var(--holo-green)" }} />
+            <span className="font-mono text-[8.5px] uppercase tracking-[0.18em] text-[var(--holo-green)]">
+              Open territory — no blocks
+            </span>
           </div>
         )}
       </div>

@@ -1,9 +1,15 @@
 import { PanelHeader } from "../PanelHeader";
 import { ScheduleMatrix } from "../ScheduleMatrix";
+import { usePageEntrance } from "@/hooks/useGsapMotion";
 
 export function ScheduleTab() {
+  const ref = usePageEntrance<HTMLDivElement>("schedule", {
+    stagger: 0.12,
+    y: 18,
+    duration: 0.5,
+  });
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4">
+    <div ref={ref} className="flex h-full min-h-0 flex-col gap-4">
       <div className="shrink-0">
         <PanelHeader
           eyebrow="J.A.R.V.I.S. // Chronos"

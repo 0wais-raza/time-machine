@@ -1,7 +1,8 @@
 import { useEffect, useRef } from "react";
-import { useApp, todayStr, PRAYERS } from "@/lib/store";
+import { useApp, todayStr, PRAYERS, NAMAZ_BONUS_CREDITS } from "@/lib/store";
 import { usePageEntrance } from "@/hooks/useGsapMotion";
 import { Aurora } from "./Aurora";
+import { Celebration } from "./Celebration";
 import { HolographicNavBar } from "./HolographicNavBar";
 import { JarvisOrb } from "./JarvisOrb";
 import { DashboardTab } from "./tabs/Dashboard";
@@ -19,6 +20,7 @@ import { requestNotifyAndShow, armNotificationSchedule } from "@/lib/pwa";
 import { buildUpcomingEvents } from "@/lib/scheduler";
 import { to12h } from "@/lib/clock";
 import { fetchPrayerTimes } from "@/lib/prayerTimes";
+import { resolveDayTimes } from "@/lib/prayerResolve";
 
 const MILESTONES = [25, 50, 75, 100];
 
@@ -29,6 +31,7 @@ export function AppShell() {
     blocks,
     prayers,
     prayerTimes,
+    customPrayerTimes,
     coords,
     setDayPrayerTimes,
     notificationsEnabled,
@@ -153,7 +156,7 @@ export function AppShell() {
       }
 
       // Prayer approaching (within 10 min)
-      const dayTimes = prayerTimes[today] ?? {};
+      const dayTimes = resolveDayTimes(prayerTimes, customPrayerTimes, today);
       for (const p of PRAYERS) {
         const tStr = dayTimes[p.name] ?? p.time;
         const [ph, pm] = tStr.split(":").map(Number);
@@ -233,6 +236,26 @@ export function AppShell() {
     notificationsEnabled,
   ]);
 
+  // Celebrate a FRESH 5/5 namaz cycle (not on load for already-complete days).
+  const prevPrayerCountRef = useRef<number | null>(null);
+  useEffect(() => {
+    const today = todayStr();
+    const count = PRAYERS.filter((p) => prayers[today]?.[p.name]).length;
+    const prev = prevPrayerCountRef.current;
+    prevPrayerCountRef.current = count;
+    if (prev !== null && prev < 5 && count === 5) {
+      window.dispatchEvent(
+        new CustomEvent("cv:celebrate", {
+          detail: {
+            title: "5 / 5 PRAYERS LOGGED",
+            message: "All five pillars honored. Cycle bonus banked.",
+            credits: NAMAZ_BONUS_CREDITS,
+          },
+        }),
+      );
+    }
+  }, [prayers]);
+
   // GSAP page transition — re-runs on every tab switch.
   const pageRef = usePageEntrance<HTMLDivElement>(activeTab, {
     stagger: 0.06,
@@ -276,6 +299,7 @@ export function AppShell() {
         </main>
       </div>
       <JarvisOrb />
+      <Celebration />
       <Toaster theme="dark" />
       <FocusOverlay />
     </div>

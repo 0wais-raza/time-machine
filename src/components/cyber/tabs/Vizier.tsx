@@ -21,6 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { formatTime12, to12h, tzName } from "@/lib/clock";
+import { resolveDayTimes } from "@/lib/prayerResolve";
 
 /** JARVIS arc reactor — pure CSS spinning rings (zero GPU cost). */
 export function ArcReactor({ size = 48 }: { size?: number }) {
@@ -39,6 +40,44 @@ export function ArcReactor({ size = 48 }: { size?: number }) {
         style={{ borderLeftColor: "var(--holo-amber)", borderRightColor: "transparent" }}
       />
       <div className="absolute inset-[42%] animate-[reactor-core_2.2s_ease-in-out_infinite] rounded-full bg-[var(--holo-cyan)] shadow-[0_0_14px_var(--holo-cyan)]" />
+    </div>
+  );
+}
+
+/** JARVIS voice-wave equalizer — GSAP-animated bars that intensify when active. */
+function VoiceWave({ active, bars = 22 }: { active: boolean; bars?: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ctx = gsap.context(() => {
+      const nodes = Array.from(el.children) as HTMLElement[];
+      const tween = gsap.to(nodes, {
+        scaleY: () => gsap.utils.random(0.12, active ? 1 : 0.5),
+        duration: () => gsap.utils.random(0.18, 0.42),
+        ease: "sine.inOut",
+        repeat: -1,
+        yoyo: true,
+        stagger: { each: 0.02, from: "random" },
+      });
+      return () => {
+        tween.kill();
+      };
+    }, el);
+    return () => ctx.revert();
+  }, [active]);
+  return (
+    <div ref={ref} className="flex h-7 items-center gap-[3px]" aria-hidden>
+      {Array.from({ length: bars }).map((_, i) => (
+        <span
+          key={i}
+          className={cn(
+            "block w-[2.5px] origin-center rounded-full",
+            active ? "bg-[var(--holo-cyan)]" : "bg-[var(--holo-cyan)]/35",
+          )}
+          style={{ height: "100%" }}
+        />
+      ))}
     </div>
   );
 }
@@ -510,7 +549,7 @@ export function VizierTab() {
           end12: to12h(b.end),
         })),
         prayersToday: live.prayers[todayStr()] ?? {},
-        prayerTimesToday: live.prayerTimes[todayStr()] ?? {},
+        prayerTimesToday: resolveDayTimes(live.prayerTimes, live.customPrayerTimes, todayStr()),
         completedBlocksToday: live.completedBlocks?.[todayStr()] ?? [],
         credits: live.credits,
         creditsEarnedToday: live.creditHistory?.[todayStr()] ?? 0,
@@ -619,7 +658,7 @@ export function VizierTab() {
       {/* JARVIS header */}
       <div className="glass-panel corner-brackets relative mb-4 flex flex-wrap items-center gap-4 overflow-hidden px-5 py-3.5">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[oklch(0.85_0.17_200/0.5)] to-transparent" />
-        <ArcReactor size={44} />
+        <ArcReactor size={48} />
         <div className="min-w-0 flex-1">
           <div className="font-mono text-[9px] font-bold uppercase tracking-[0.3em] text-[var(--holo-cyan)]">
             J.A.R.V.I.S. // Core Intelligence Online
@@ -628,10 +667,27 @@ export function VizierTab() {
             {active?.title ?? "THE VIZIER"}
           </div>
         </div>
+        {/* voice-wave core — always breathing, peaks while synthesizing */}
+        <div className="hidden items-center gap-3 md:flex">
+          <div className="flex flex-col items-end gap-1">
+            <VoiceWave active={busy} />
+            <span
+              className={cn(
+                "font-mono text-[8px] uppercase tracking-[0.3em]",
+                busy ? "text-[var(--holo-cyan)]" : "text-muted-foreground/60",
+              )}
+            >
+              {busy ? "Synthesizing" : "Standby"}
+            </span>
+          </div>
+        </div>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
           <span className="flex items-center gap-1.5">
-            <span className="led-dot" style={{ color: "var(--holo-green)" }} />
-            Tactical Advisor Online
+            <span
+              className="led-dot"
+              style={{ color: busy ? "var(--holo-cyan)" : "var(--holo-green)" }}
+            />
+            {busy ? "Processing" : "Tactical Advisor Online"}
           </span>
           <span>
             Missions{" "}
@@ -783,10 +839,10 @@ export function VizierTab() {
                 >
                   <div
                     className={cn(
-                      "holo-panel max-w-[85%] px-3.5 py-2.5 text-sm whitespace-pre-wrap leading-relaxed",
+                      "holo-panel relative max-w-[85%] px-3.5 py-2.5 text-sm whitespace-pre-wrap leading-relaxed",
                       m.role === "user"
                         ? "border-[oklch(0.66_0.27_295/0.45)] bg-[oklch(0.66_0.27_295/0.08)]"
-                        : "border-[oklch(0.85_0.17_200/0.28)]",
+                        : "border-l-2 border-l-[var(--holo-cyan)]/50 border-[oklch(0.85_0.17_200/0.28)] bg-[oklch(0.1_0.02_270/0.5)]",
                     )}
                   >
                     <div className="mb-1 flex items-center gap-1.5 text-[9px] uppercase tracking-[0.25em]">

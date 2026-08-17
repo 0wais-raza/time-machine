@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useApp, PRAYERS } from "@/lib/store";
 import { PanelHeader } from "../PanelHeader";
 import { HudLabel } from "../HudLabel";
@@ -23,6 +23,7 @@ import { toast } from "sonner";
 import { Gauge } from "lucide-react";
 import { todayStr } from "@/lib/store";
 import { useGsapReveal } from "@/hooks/useGsapReveal";
+import { useCountUpValue } from "@/hooks/useGsapMotion";
 
 function lastNDays(n: number): string[] {
   const arr: string[] = [];
@@ -69,7 +70,9 @@ function Stat({
         {label}
       </div>
       <div className="mt-1.5 flex items-baseline gap-2">
-        <span className={cn("font-mono-tech text-[22px] font-bold tabular-nums leading-none", accent)}>
+        <span
+          className={cn("font-mono-tech text-[22px] font-bold tabular-nums leading-none", accent)}
+        >
           {value}
         </span>
         {sub && <span className="truncate text-[11px] text-muted-foreground">{sub}</span>}
@@ -198,6 +201,13 @@ export function AnalyticsTab() {
     ];
   }, [tasks]);
 
+  // GSAP count-up telemetry (must sit after the memoized values they read).
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const scoreAnim = useCountUpValue(score, { duration: 1.1, disabled: !mounted });
+  const velocityAnim = useCountUpValue(velocity.pct, { duration: 1.1, disabled: !mounted });
+  const creditsAnim = useCountUpValue(credits, { duration: 1.1, disabled: !mounted });
+
   const ask = async () => {
     setBusy(true);
     setSummary("");
@@ -250,20 +260,26 @@ export function AnalyticsTab() {
       <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Stat
           label="Productivity Score"
-          value={`${score}/100`}
+          value={`${Math.round(scoreAnim)}/100`}
           sub={score >= 70 ? "NOMINAL" : score >= 40 ? "STABLE" : "CRITICAL"}
-          accent={score >= 70 ? "text-[var(--holo-green)]" : score >= 40 ? "text-[var(--holo-cyan)]" : "text-[var(--holo-pink)]"}
+          accent={
+            score >= 70
+              ? "text-[var(--holo-green)]"
+              : score >= 40
+                ? "text-[var(--holo-cyan)]"
+                : "text-[var(--holo-pink)]"
+          }
         />
         <Stat
           label="Execution Velocity"
-          value={`${velocity.pct}%`}
+          value={`${Math.round(velocityAnim)}%`}
           sub={`${velocity.done} done / ${velocity.planned} blocks`}
           accent="text-[var(--holo-violet)]"
           icon={<Gauge className="size-3" />}
         />
         <Stat
           label="Cyber Credits"
-          value={String(credits)}
+          value={String(Math.round(creditsAnim))}
           sub={earnedToday > 0 ? `+${earnedToday} today` : "no gains today"}
           accent="text-[var(--holo-amber)]"
           icon={<Coins className="size-3" />}
@@ -284,7 +300,13 @@ export function AnalyticsTab() {
               <XAxis dataKey="day" {...AXIS} interval={1} />
               <YAxis {...AXIS} allowDecimals={false} />
               <Tooltip {...CHART_TOOLTIP} />
-              <Area type="monotone" dataKey="credits" stroke="var(--holo-cyan)" strokeWidth={2} fill="url(#cr)" />
+              <Area
+                type="monotone"
+                dataKey="credits"
+                stroke="var(--holo-cyan)"
+                strokeWidth={2}
+                fill="url(#cr)"
+              />
             </AreaChart>
           </ResponsiveContainer>
         </ChartPanel>
@@ -314,7 +336,13 @@ export function AnalyticsTab() {
               <XAxis dataKey="day" {...AXIS} />
               <YAxis {...AXIS} />
               <Tooltip {...CHART_TOOLTIP} />
-              <Area type="monotone" dataKey="productivity" stroke="var(--holo-violet)" strokeWidth={2} fill="url(#p1)" />
+              <Area
+                type="monotone"
+                dataKey="productivity"
+                stroke="var(--holo-violet)"
+                strokeWidth={2}
+                fill="url(#p1)"
+              />
             </AreaChart>
           </ResponsiveContainer>
         </ChartPanel>
@@ -334,7 +362,14 @@ export function AnalyticsTab() {
         <ChartPanel label="Mission Completion" accent="cyan">
           <ResponsiveContainer width="100%" height={220}>
             <PieChart>
-              <Pie data={completion} dataKey="value" innerRadius={55} outerRadius={85} paddingAngle={3} stroke="none">
+              <Pie
+                data={completion}
+                dataKey="value"
+                innerRadius={55}
+                outerRadius={85}
+                paddingAngle={3}
+                stroke="none"
+              >
                 <Cell fill="var(--holo-cyan)" />
                 <Cell fill="oklch(1 1 1 / 0.1)" />
               </Pie>
@@ -343,7 +378,8 @@ export function AnalyticsTab() {
           </ResponsiveContainer>
           <div className="mt-2 flex justify-center gap-5 text-xs">
             <span className="flex items-center gap-1.5 text-foreground/80">
-              <span className="size-2 rounded-full bg-[var(--holo-cyan)] shadow-[0_0_6px_1px_var(--holo-cyan)]" /> Done
+              <span className="size-2 rounded-full bg-[var(--holo-cyan)] shadow-[0_0_6px_1px_var(--holo-cyan)]" />{" "}
+              Done
             </span>
             <span className="flex items-center gap-1.5 text-foreground/80">
               <span className="size-2 rounded-full bg-[oklch(1_1_1/0.1)]" /> Open
@@ -351,17 +387,22 @@ export function AnalyticsTab() {
           </div>
         </ChartPanel>
 
-        <ChartPanel label="Vizier Executive Brief" accent="violet" right={
-          <Button size="sm" onClick={ask} disabled={busy}>
-            <Sparkles className="size-3.5 mr-1" /> {busy ? "Analyzing…" : "Generate"}
-          </Button>
-        }>
+        <ChartPanel
+          label="Vizier Executive Brief"
+          accent="violet"
+          right={
+            <Button size="sm" onClick={ask} disabled={busy}>
+              <Sparkles className="size-3.5 mr-1" /> {busy ? "Analyzing…" : "Generate"}
+            </Button>
+          }
+        >
           <div className="relative min-h-[180px] rounded-lg border border-[oklch(0.85_0.17_200/0.2)] bg-[oklch(0.1_0.02_260/0.4)] p-4 text-sm leading-relaxed whitespace-pre-wrap">
             <span className="pointer-events-none absolute left-0 top-0 size-2 border-l-2 border-t-2 border-[var(--holo-violet)/60]" />
             <span className="pointer-events-none absolute right-0 top-0 size-2 border-b-2 border-r-2 border-[var(--holo-violet)/60]" />
             {summary || (
               <span className="text-muted-foreground italic">
-                Press Generate to receive a performance brief. Requires an OpenRouter API key in System Core.
+                Press Generate to receive a performance brief. Requires an OpenRouter API key in
+                System Core.
               </span>
             )}
           </div>

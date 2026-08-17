@@ -1,5 +1,6 @@
 import { useApp, PRAYERS, todayStr } from "./store";
 import { to12h } from "./clock";
+import { resolveDayTimes } from "./prayerResolve";
 
 export interface ScheduledEvent {
   id: string;
@@ -63,7 +64,7 @@ export function buildUpcomingEvents(): ScheduledEvent[] {
   }
 
   // Prayer approach today (future, not yet logged).
-  const dayTimes = s.prayerTimes[today] ?? {};
+  const dayTimes = resolveDayTimes(s.prayerTimes, s.customPrayerTimes, today);
   for (const p of PRAYERS) {
     if (s.prayers[today]?.[p.name]) continue;
     const t = dayTimes[p.name] ?? p.time;

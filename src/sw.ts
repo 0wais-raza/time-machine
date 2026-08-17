@@ -11,10 +11,14 @@ interface ScheduledEvent {
   tag?: string;
 }
 
-/** Simple app-shell + offline caching. */
-const CACHE_HTML = "cv-html-v1";
-const CACHE_STATIC = "cv-static-v1";
-const CACHE_FONTS = "cv-fonts-v1";
+/** Simple app-shell + offline caching.
+ *  Bump the version when shipping UI changes: the SW serves static assets
+ *  cache-first, so without a bump users keep the previous bundle forever. */
+const CACHE_HTML = "cv-html-v2";
+const CACHE_STATIC = "cv-static-v2";
+const CACHE_FONTS = "cv-fonts-v2";
+/** Old cache names to purge on activate (one-time migration). */
+const STALE_CACHE_NAMES = ["cv-html-v1", "cv-static-v1", "cv-fonts-v1"];
 /** Schedule persistence — survives service worker restarts. */
 const CACHE_SCHEDULE = "cv-schedule-v1";
 const SCHEDULE_KEY = "/schedule.json";
@@ -100,6 +104,11 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     (async () => {
       await self.clients.claim();
+      // Purge superseded caches so updated bundles are never served stale.
+      const keys = await caches.keys();
+      await Promise.all(
+        keys.filter((k) => STALE_CACHE_NAMES.includes(k)).map((k) => caches.delete(k)),
+      );
       // Re-arm from persisted schedule after any restart.
       const list = await readSchedule();
       await armSchedule(list);
@@ -120,8 +129,7 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("message", (event) => {
   const data = (event as ExtendableMessageEvent).data as
-    | { type?: string; events?: ScheduledEvent[] }
-    | undefined;
+    { type?: string; events?: ScheduledEvent[] } | undefined;
   if (!data) return;
   if (data.type === "ARM_NOTIFICATIONS" && Array.isArray(data.events)) {
     event.waitUntil(armSchedule(data.events as ScheduledEvent[]));
@@ -148,7 +156,7 @@ self.addEventListener("periodicsync", (event) => {
 });
 
 self.addEventListener("notificationclick", (event) => {
-  const url = ((event.notification.data as { url?: string } | undefined)?.url) || "/";
+  const url = (event.notification.data as { url?: string } | undefined)?.url || "/";
   event.notification.close();
   event.waitUntil(
     (async () => {

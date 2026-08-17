@@ -75,28 +75,30 @@ export function Aurora({
     >
       {/* base gradient line — the "gradient at the top" signature */}
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[var(--holo-cyan)]/70 to-transparent" />
+      {/*
+        Soft gradient blobs animated with transforms only. No CSS blur filter:
+        large blur radii are one of the costliest GPU operations and made the
+        whole app laggy on low-end machines. Radial falloff does the same job.
+      */}
       <div
         ref={aRef}
-        className="absolute -top-40 left-[-10%] size-[420px] rounded-full"
+        className="absolute -top-44 left-[-12%] size-[440px] rounded-full will-change-transform"
         style={{
-          background: `radial-gradient(circle, oklch(0.85 0.17 200 / ${alpha}) 0%, transparent 62%)`,
-          filter: "blur(46px)",
+          background: `radial-gradient(circle, oklch(0.85 0.17 200 / ${alpha}) 0%, oklch(0.85 0.17 200 / ${alpha * 0.18}) 34%, transparent 62%)`,
         }}
       />
       <div
         ref={bRef}
-        className="absolute -top-32 right-[-8%] size-[400px] rounded-full"
+        className="absolute -top-36 right-[-10%] size-[420px] rounded-full will-change-transform"
         style={{
-          background: `radial-gradient(circle, oklch(0.66 0.27 295 / ${alpha * 0.85}) 0%, transparent 62%)`,
-          filter: "blur(46px)",
+          background: `radial-gradient(circle, oklch(0.66 0.27 295 / ${alpha * 0.85}) 0%, oklch(0.66 0.27 295 / ${alpha * 0.16}) 34%, transparent 62%)`,
         }}
       />
       <div
         ref={cRef}
-        className="absolute top-[-100px] left-1/2 size-[380px] -translate-x-1/2 rounded-full"
+        className="absolute top-[-110px] left-1/2 size-[400px] -translate-x-1/2 rounded-full will-change-transform"
         style={{
-          background: `radial-gradient(circle, oklch(0.72 0.24 350 / ${alpha * 0.6}) 0%, transparent 62%)`,
-          filter: "blur(52px)",
+          background: `radial-gradient(circle, oklch(0.72 0.24 350 / ${alpha * 0.6}) 0%, oklch(0.72 0.24 350 / ${alpha * 0.12}) 34%, transparent 62%)`,
         }}
       />
     </div>

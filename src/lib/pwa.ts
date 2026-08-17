@@ -19,7 +19,8 @@ async function unregisterAppSw() {
   try {
     const regs = await navigator.serviceWorker.getRegistrations();
     for (const reg of regs) {
-      const scriptURL = reg.active?.scriptURL ?? reg.installing?.scriptURL ?? reg.waiting?.scriptURL;
+      const scriptURL =
+        reg.active?.scriptURL ?? reg.installing?.scriptURL ?? reg.waiting?.scriptURL;
       if (scriptURL && new URL(scriptURL).pathname === APP_SW_PATH) {
         await reg.unregister();
       }
@@ -91,8 +92,12 @@ export async function sendSystemNotification(
     return false;
   }
   const icon = "/icons/icon-192.png";
-  try {
-    if ("serviceWorker" in navigator) {
+
+  // Path 1: service worker. If it throws or is unavailable we MUST fall
+  // through to the direct API instead of giving up — this was the bug that
+  // made "Test Alert" silently fail whenever the SW path hiccuped.
+  if ("serviceWorker" in navigator) {
+    try {
       const reg = await navigator.serviceWorker.getRegistration();
       if (reg) {
         await reg.showNotification(
@@ -103,16 +108,30 @@ export async function sendSystemNotification(
             icon,
             badge: icon,
             tag: opts.tag,
-            renotify: opts.tag ? opts.renotify ?? true : undefined,
+            renotify: opts.tag ? (opts.renotify ?? true) : undefined,
             data: { url: "/" },
           } as NotificationOptions,
         );
         return true;
       }
+    } catch (err) {
+      console.warn("[pwa] SW notification path failed, falling back to direct", err);
     }
-    new Notification(title, { body, icon, tag: opts.tag, data: { url: "/" } });
+  }
+
+  // Path 2: direct constructor (works in dev where no SW is registered).
+  try {
+    const n = new Notification(title, {
+      body,
+      icon,
+      tag: opts.tag,
+      data: { url: "/" },
+    });
+    // Auto-close after 12s so a repeated tag doesn't stack in the Action Center.
+    window.setTimeout(() => n.close(), 12000);
     return true;
-  } catch {
+  } catch (err) {
+    console.warn("[pwa] direct notification failed", err);
     return false;
   }
 }

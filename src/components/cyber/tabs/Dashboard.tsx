@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { partById } from "@/lib/hardware";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useCountUpValue, useScanSweep, useTilt } from "@/hooks/useGsapMotion";
+import { resolveDayTimes } from "@/lib/prayerResolve";
 
 function Radial({ value, mounted }: { value: number; mounted: boolean }) {
   const r = 40;
@@ -69,6 +70,7 @@ export function DashboardTab() {
     blocks,
     prayers,
     prayerTimes,
+    customPrayerTimes,
     toggleTask,
     togglePrayer,
     credits,
@@ -84,7 +86,7 @@ export function DashboardTab() {
   const streak = mounted ? persistedStreak : 0;
   const today = todayStr();
   const todayPrayers = prayers[today] ?? {};
-  const liveTimes = prayerTimes[today] ?? {};
+  const liveTimes = resolveDayTimes(prayerTimes, customPrayerTimes, today);
   const done = tasks.filter((t) => t.done).length;
   const pct = Math.round((done / Math.max(1, tasks.length)) * 100);
   const top = [...tasks].filter((t) => !t.done).slice(0, 5);
@@ -289,7 +291,7 @@ export function DashboardTab() {
             </div>
             <div className="mt-3 flex items-center justify-between border-t border-[oklch(1_1_1/0.06)] pt-2 font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground/70">
               <span>Cycle {prayerDone}/5</span>
-              <span className="text-[var(--holo-amber)]">+5 CR bonus</span>
+              <span className="text-[var(--holo-amber)]">+1 CR · full cycle +10</span>
             </div>
           </div>
           <div className="glass-panel p-4">
@@ -314,6 +316,15 @@ export function DashboardTab() {
         {/* Center — JARVIS clock */}
         <div className="relative flex items-center justify-center overflow-hidden lg:col-span-6">
           <div className="cyber-grid pointer-events-none absolute inset-0 opacity-50" />
+          {/* soft depth glow behind the dial */}
+          <div
+            className="pointer-events-none absolute left-1/2 top-1/2 size-[420px] -translate-x-1/2 -translate-y-1/2 rounded-full"
+            style={{
+              background:
+                "radial-gradient(circle, oklch(0.85 0.17 200 / 0.07) 0%, oklch(0.66 0.27 295 / 0.05) 38%, transparent 70%)",
+            }}
+          />
+          <div className="pointer-events-none absolute left-1/2 top-1/2 size-[300px] -translate-x-1/2 -translate-y-1/2 animate-[holo-pulse_5s_ease-in-out_infinite] rounded-full bg-[oklch(0.85_0.17_200/0.05)]" />
           <JarvisClock size={isMobile ? 300 : 380} />
         </div>
 

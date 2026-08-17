@@ -130,17 +130,18 @@ export function usePageEntrance<T extends HTMLElement = HTMLDivElement>(
     const targets = Array.from(el.querySelectorAll(selector));
     if (!targets.length) return;
     const ctx = gsap.context(() => {
+      // Transform-only (opacity + y + scale) — no blur filter, which is an
+      // expensive GPU pass and caused visible lag during tab switches.
       gsap.fromTo(
         targets,
-        { opacity: 0, y, filter: "blur(3px)" },
+        { opacity: 0, y, scale: 0.985 },
         {
           opacity: 1,
           y: 0,
-          filter: "blur(0px)",
+          scale: 1,
           duration,
           ease: "power3.out",
           stagger,
-          clearProps: "filter",
           overwrite: "auto",
         },
       );
