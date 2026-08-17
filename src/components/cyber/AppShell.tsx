@@ -1,5 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useApp, todayStr, PRAYERS } from "@/lib/store";
+import { usePageEntrance } from "@/hooks/useGsapMotion";
+import { Aurora } from "./Aurora";
 import { HolographicNavBar } from "./HolographicNavBar";
 import { JarvisOrb } from "./JarvisOrb";
 import { DashboardTab } from "./tabs/Dashboard";
@@ -97,7 +99,11 @@ export function AppShell() {
         const key = `deadline:${t.id}`;
         if (due <= nowMs && !dispatched[key]) {
           markDispatched(key);
-          pushNotification({ kind: "deadline", title: `Deadline // ${t.title}`, body: "Execute now." });
+          pushNotification({
+            kind: "deadline",
+            title: `Deadline // ${t.title}`,
+            body: "Execute now.",
+          });
           toast(`Deadline reached`, { description: t.title });
           if (notificationsEnabled)
             requestNotifyAndShow(`Deadline // ${t.title}`, "Execute now.", {
@@ -116,7 +122,12 @@ export function AppShell() {
         if (startMins <= nowMins && startMins >= nowMins - 1 && !dispatched[key]) {
           markDispatched(key);
           const range = `${to12h(b.start)} – ${to12h(b.end)}`;
-          pushNotification({ kind: "block", title: `Block // ${b.title}`, body: range, refId: b.id });
+          pushNotification({
+            kind: "block",
+            title: `Block // ${b.title}`,
+            body: range,
+            refId: b.id,
+          });
           if (notificationsEnabled && typeof window !== "undefined" && "Notification" in window) {
             const blockId = b.id;
             const tag = `cv-block-${b.id}-${today}`;
@@ -168,7 +179,16 @@ export function AppShell() {
     tick();
     const id = setInterval(tick, 60 * 1000);
     return () => clearInterval(id);
-  }, [tasks, blocks, prayers, prayerTimes, notificationsEnabled, dispatched, markDispatched, pushNotification]);
+  }, [
+    tasks,
+    blocks,
+    prayers,
+    prayerTimes,
+    notificationsEnabled,
+    dispatched,
+    markDispatched,
+    pushNotification,
+  ]);
 
   // Recovery Briefing — CRITICAL missions past due without completion trigger a
   // one-time audit message from the Chief of Staff.
@@ -194,7 +214,9 @@ export function AppShell() {
             content: brief,
             createdAt: new Date().toISOString(),
           });
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
         toast(`Recovery Briefing // ${t.title}`, { description: "Critical mission missed." });
         if (notificationsEnabled) requestNotifyAndShow("Recovery Briefing", t.title);
       }
@@ -202,7 +224,21 @@ export function AppShell() {
     check();
     const id = setInterval(check, 60 * 1000);
     return () => clearInterval(id);
-  }, [tasks, recoveryBriefed, markRecoveryBriefed, pushNotification, pushToActive, notificationsEnabled]);
+  }, [
+    tasks,
+    recoveryBriefed,
+    markRecoveryBriefed,
+    pushNotification,
+    pushToActive,
+    notificationsEnabled,
+  ]);
+
+  // GSAP page transition — re-runs on every tab switch.
+  const pageRef = usePageEntrance<HTMLDivElement>(activeTab, {
+    stagger: 0.06,
+    y: 26,
+    duration: 0.55,
+  });
 
   // Closed-tab delivery: keep the service worker's schedule in sync with live
   // state, and re-arm the instant the app leaves the screen (close / hide).
@@ -225,15 +261,18 @@ export function AppShell() {
     <div className="flex h-screen w-screen overflow-hidden">
       <div className="flex min-w-0 flex-1 flex-col">
         <HolographicNavBar />
-        <main className="scroll-y-clean flex-1 min-h-0 px-6 py-6">
-          {activeTab === "dashboard" && <DashboardTab />}
-          {activeTab === "namaz" && <NamazTab />}
-          {activeTab === "todo" && <TodoTab />}
-          {activeTab === "schedule" && <ScheduleTab />}
-          {activeTab === "analytics" && <AnalyticsTab />}
-          {activeTab === "workbench" && <WorkbenchTab />}
-          {activeTab === "vizier" && <VizierTab />}
-          {activeTab === "settings" && <SettingsTab />}
+        <main className="scroll-y-clean relative flex-1 min-h-0 px-6 py-6">
+          <Aurora intensity="normal" />
+          <div ref={pageRef} key={activeTab} className="relative flex h-full min-h-0 flex-col">
+            {activeTab === "dashboard" && <DashboardTab />}
+            {activeTab === "namaz" && <NamazTab />}
+            {activeTab === "todo" && <TodoTab />}
+            {activeTab === "schedule" && <ScheduleTab />}
+            {activeTab === "analytics" && <AnalyticsTab />}
+            {activeTab === "workbench" && <WorkbenchTab />}
+            {activeTab === "vizier" && <VizierTab />}
+            {activeTab === "settings" && <SettingsTab />}
+          </div>
         </main>
       </div>
       <JarvisOrb />

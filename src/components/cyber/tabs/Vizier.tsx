@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import gsap from "gsap";
 import {
   Bot,
   Sparkles,
@@ -105,9 +106,7 @@ export function VizierTab() {
   // Overdue tasks (live).
   const overdue = useMemo(() => {
     const now = Date.now();
-    return tasks.filter(
-      (t) => !t.done && t.dueDate && new Date(t.dueDate).getTime() < now,
-    );
+    return tasks.filter((t) => !t.done && t.dueDate && new Date(t.dueDate).getTime() < now);
   }, [tasks]);
 
   // Proactive boot greeting — once per session.
@@ -155,9 +154,70 @@ export function VizierTab() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "auto", block: "end" });
   }, [activeSessionId]);
+
+  // GSAP message entrance — animate the newest message in.
+  const msgBoxRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
+    if (!chat.length) return;
+    const nodes = msgBoxRef.current?.querySelectorAll("[data-msg]");
+    const el = nodes?.[nodes.length - 1];
+    if (!el) return;
+    const tween = gsap.fromTo(
+      el,
+      { opacity: 0, y: 14, scale: 0.985, filter: "blur(4px)" },
+      {
+        opacity: 1,
+        y: 0,
+        scale: 1,
+        filter: "blur(0px)",
+        duration: 0.5,
+        ease: "power3.out",
+        clearProps: "filter",
+      },
+    );
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [chat.length, busy]);
+    return () => {
+      tween.kill();
+    };
+  }, [chat.length]);
+
+  // GSAP session-rail entrance stagger.
+  const railRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = railRef.current;
+    if (!el) return;
+    const ctx = gsap.context(() => {
+      gsap.fromTo(
+        el.children,
+        { opacity: 0, x: -10 },
+        { opacity: 1, x: 0, duration: 0.35, ease: "power2.out", stagger: 0.04 },
+      );
+    }, el);
+    return () => ctx.revert();
+  }, [activeSessionId]);
+
+  // GSAP typing indicator — orbiting dots around the reactor.
+  const busyRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = busyRef.current;
+    if (!el || !busy) return;
+    const ctx = gsap.context(() => {
+      gsap.fromTo(
+        el.querySelectorAll(".busy-dot"),
+        { y: 0, opacity: 0.35 },
+        {
+          y: -5,
+          opacity: 1,
+          duration: 0.5,
+          ease: "sine.inOut",
+          yoyo: true,
+          repeat: -1,
+          stagger: 0.14,
+        },
+      );
+    }, el);
+    return () => ctx.revert();
+  }, [busy]);
 
   const runAction = (a: VizierAction) => {
     const p = a.payload ?? {};
@@ -185,9 +245,7 @@ export function VizierTab() {
             end: String(p.end ?? "10:00"),
             date: String(p.date ?? todayStr()),
             dayOfWeek:
-              typeof p.dayOfWeek === "number"
-                ? (p.dayOfWeek as number)
-                : new Date().getDay(),
+              typeof p.dayOfWeek === "number" ? (p.dayOfWeek as number) : new Date().getDay(),
           });
           addMemoryNote(`Block scheduled via Vizier: ${p.title} ${p.start}-${p.end}`);
           toast.success(`Block scheduled: ${p.title} (overlaps resolved)`);
@@ -377,7 +435,10 @@ export function VizierTab() {
       id: newId(),
       role: "user",
       content:
-        text + (attachments.length ? ` [+${attachments.length} image${attachments.length > 1 ? "s" : ""}]` : ""),
+        text +
+        (attachments.length
+          ? ` [+${attachments.length} image${attachments.length > 1 ? "s" : ""}]`
+          : ""),
       createdAt: new Date().toISOString(),
     });
     const sentAttachments = attachments;
@@ -402,15 +463,14 @@ export function VizierTab() {
         .sort((a, z) => a.sMins - z.sMins);
       const activeNow = todayBlocks.find((x) => nowMins >= x.sMins && nowMins < x.eMins)?.b;
       const nextUp = todayBlocks.find((x) => x.sMins >= nowMins)?.b;
-      const rigValue = live.ownedParts.reduce(
-        (s, id) => s + (partById(id)?.price ?? 0),
-        0,
-      );
+      const rigValue = live.ownedParts.reduce((s, id) => s + (partById(id)?.price ?? 0), 0);
       const ctx = buildContext({
         operator: profile.name,
         nowLocal: formatTime12(now),
         nowISO: now.toISOString(),
-        weekday: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][now.getDay()],
+        weekday: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][
+          now.getDay()
+        ],
         timezone: tzName(),
         today: todayStr(),
         app: "Chronos Vizier (CyberTime Machine)",
@@ -459,12 +519,11 @@ export function VizierTab() {
         rigValue,
         catalog: CATALOG.map((p) => `${p.id}(${p.slot},${p.price})`).join(" "),
         focusActive: live.focusTaskId
-          ? live.tasks.find((t) => t.id === live.focusTaskId)?.title ?? null
+          ? (live.tasks.find((t) => t.id === live.focusTaskId)?.title ?? null)
           : null,
         memoryNotes: live.memory.notes.slice(0, 12),
       });
-      const session =
-        live.sessions.find((s) => s.id === live.activeSessionId) ?? live.sessions[0];
+      const session = live.sessions.find((s) => s.id === live.activeSessionId) ?? live.sessions[0];
       const history = session?.messages ?? [];
       const reply = await callVizier(history, ctx, settings.aiModel, {
         maxTokens: settings.aiDepth === "deep" ? 1100 : 480,
@@ -575,15 +634,14 @@ export function VizierTab() {
             Tactical Advisor Online
           </span>
           <span>
-            Missions <b className="text-[var(--holo-cyan)]">{tasks.filter((t) => !t.done).length}</b>
+            Missions{" "}
+            <b className="text-[var(--holo-cyan)]">{tasks.filter((t) => !t.done).length}</b>
           </span>
           <span className="flex items-center gap-1">
             <Coins className="size-3 text-[var(--holo-amber)]" />
             <b className="text-[var(--holo-amber)]">{credits}</b>
           </span>
-          <span suppressHydrationWarning>
-            {mounted ? formatTime12(new Date(), false) : ""}
-          </span>
+          <span suppressHydrationWarning>{mounted ? formatTime12(new Date(), false) : ""}</span>
         </div>
       </div>
 
@@ -605,7 +663,7 @@ export function VizierTab() {
               <Plus className="size-3.5" />
             </Button>
           </div>
-          <div className="scroll-y-clean min-h-0 flex-1 p-2">
+          <div ref={railRef} className="scroll-y-clean min-h-0 flex-1 p-2">
             {sessions.map((s) => {
               const isActive = s.id === active?.id;
               return (
@@ -668,8 +726,8 @@ export function VizierTab() {
             </span>
           </div>
 
-          <div className="scroll-y-clean min-h-0 flex-1 px-5 py-4">
-            {!openrouterKey && !(import.meta.env.VITE_OPENROUTER_API_KEY) && (
+          <div ref={msgBoxRef} className="scroll-y-clean min-h-0 flex-1 px-5 py-4">
+            {!openrouterKey && !import.meta.env.VITE_OPENROUTER_API_KEY && (
               <div className="mb-3 rounded border border-[oklch(0.72_0.28_350_/_0.4)] bg-[oklch(0.72_0.28_350_/_0.1)] px-3 py-2 text-[11px] text-[var(--holo-pink)]">
                 No OpenRouter key set — add one in System Core. It stays in your browser.
               </div>
@@ -720,6 +778,7 @@ export function VizierTab() {
               chat.map((m) => (
                 <div
                   key={m.id}
+                  data-msg
                   className={cn("mb-4 flex", m.role === "user" ? "justify-end" : "justify-start")}
                 >
                   <div
@@ -754,17 +813,21 @@ export function VizierTab() {
                 </div>
               ))}
             {busy && (
-              <div className="flex items-center gap-2.5 font-mono text-[10px] uppercase tracking-[0.25em] text-[var(--holo-cyan)]">
+              <div
+                ref={busyRef}
+                className="flex items-center gap-2.5 font-mono text-[10px] uppercase tracking-[0.25em] text-[var(--holo-cyan)]"
+              >
+                <span className="relative flex size-4 items-center justify-center">
+                  <span
+                    className="absolute inset-0 animate-[holo-spin_1.4s_linear_infinite] rounded-full border-2 border-transparent"
+                    style={{ borderTopColor: "var(--holo-cyan)" }}
+                  />
+                  <span className="busy-dot size-1 rounded-full bg-[var(--holo-cyan)]" />
+                </span>
                 <span className="flex gap-1">
-                  <span className="size-1.5 animate-[holo-pulse_1s_ease-in-out_infinite] rounded-full bg-[var(--holo-cyan)]" />
-                  <span
-                    className="size-1.5 animate-[holo-pulse_1s_ease-in-out_infinite] rounded-full bg-[var(--holo-cyan)]"
-                    style={{ animationDelay: "0.2s" }}
-                  />
-                  <span
-                    className="size-1.5 animate-[holo-pulse_1s_ease-in-out_infinite] rounded-full bg-[var(--holo-cyan)]"
-                    style={{ animationDelay: "0.4s" }}
-                  />
+                  <span className="busy-dot size-1.5 rounded-full bg-[var(--holo-cyan)]" />
+                  <span className="busy-dot size-1.5 rounded-full bg-[var(--holo-violet)]" />
+                  <span className="busy-dot size-1.5 rounded-full bg-[var(--holo-pink)]" />
                 </span>
                 JARVIS processing
               </div>
@@ -790,7 +853,10 @@ export function VizierTab() {
             {attachments.length > 0 && (
               <div className="mb-2 flex flex-wrap gap-1.5">
                 {attachments.map((a, i) => (
-                  <div key={i} className="relative h-12 w-12 overflow-hidden rounded border border-border">
+                  <div
+                    key={i}
+                    className="relative h-12 w-12 overflow-hidden rounded border border-border"
+                  >
                     <img src={a.dataUrl} alt="" className="h-full w-full object-cover" />
                     <button
                       onClick={() => setAttachments((s) => s.filter((_, j) => j !== i))}

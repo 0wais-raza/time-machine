@@ -1,6 +1,13 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useApp } from "@/lib/store";
-import { CATALOG, SLOTS, partById, partImage, type HardwarePart, type PartSlot } from "@/lib/hardware";
+import {
+  CATALOG,
+  SLOTS,
+  partById,
+  partImage,
+  type HardwarePart,
+  type PartSlot,
+} from "@/lib/hardware";
 import { PanelHeader } from "../PanelHeader";
 import { HudLabel } from "../HudLabel";
 import { Button } from "@/components/ui/button";
@@ -23,9 +30,7 @@ import { toast } from "sonner";
 // three.js (+ R3F) is ~600KB — lazy-load it so it only downloads/parses
 // when the RIG ARMORY tab is actually opened. Keeps the command hub snappy
 // on low-end machines.
-const LazyRigCanvas = lazy(() =>
-  import("../rig/PcRig3D").then((m) => ({ default: m.RigCanvas })),
-);
+const LazyRigCanvas = lazy(() => import("../rig/PcRig3D").then((m) => ({ default: m.RigCanvas })));
 
 function Meter({ label, value }: { label: string; value: number }) {
   return (
@@ -37,7 +42,9 @@ function Meter({ label, value }: { label: string; value: number }) {
             key={i}
             className={cn(
               "h-1.5 w-2.5 rounded-[2px]",
-              i < value ? "bg-[var(--holo-cyan)] shadow-[0_0_5px_oklch(0.85_0.17_200/0.5)]" : "bg-border",
+              i < value
+                ? "bg-[var(--holo-cyan)] shadow-[0_0_5px_oklch(0.85_0.17_200/0.5)]"
+                : "bg-border",
             )}
           />
         ))}
@@ -124,7 +131,9 @@ function StoreCard({
         </div>
         <div className="flex shrink-0 items-center gap-1 rounded-md border border-[oklch(0.82_0.16_80/0.35)] bg-[oklch(0.82_0.16_80/0.08)] px-2 py-1">
           <Coins className="size-3 text-[var(--holo-amber)]" />
-          <span className="font-mono-tech text-xs font-bold text-[var(--holo-amber)]">{part.price}</span>
+          <span className="font-mono-tech text-xs font-bold text-[var(--holo-amber)]">
+            {part.price}
+          </span>
         </div>
       </div>
 
@@ -206,7 +215,9 @@ function StoreCard({
 function RigPanel({ equipped }: { equipped: Set<PartSlot> }) {
   const [mounted, setMounted] = useState(false);
   const [webgl, setWebgl] = useState<boolean | null>(null);
-  const [Fallback, setFallback] = useState<React.ComponentType<{ equipped: Set<PartSlot> }> | null>(null);
+  const [Fallback, setFallback] = useState<React.ComponentType<{ equipped: Set<PartSlot> }> | null>(
+    null,
+  );
   const [autoRotate, setAutoRotate] = useState(false);
   const { ownedParts, equippedParts, equipPart, unequipPart } = useApp();
 
@@ -232,8 +243,12 @@ function RigPanel({ equipped }: { equipped: Set<PartSlot> }) {
       {/* header */}
       <div className="flex flex-wrap items-center gap-3 border-b border-[oklch(0.85_0.17_200/0.12)] px-4 py-3">
         <div className="flex items-center gap-2">
-          <Zap className={cn("size-4", powered ? "text-[var(--holo-cyan)]" : "text-muted-foreground")} />
-          <HudLabel dot={false} className="tracking-[0.14em]">The Rig // Live Assembly</HudLabel>
+          <Zap
+            className={cn("size-4", powered ? "text-[var(--holo-cyan)]" : "text-muted-foreground")}
+          />
+          <HudLabel dot={false} className="tracking-[0.14em]">
+            The Rig // Live Assembly
+          </HudLabel>
         </div>
         <div className="flex items-center gap-3 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
           <span className="flex items-center gap-1.5">
@@ -265,7 +280,9 @@ function RigPanel({ equipped }: { equipped: Set<PartSlot> }) {
             )}
             title="Toggle auto-rotation"
           >
-            <RotateCw className={cn("size-3.5", autoRotate && "animate-[holo-spin_2.5s_linear_infinite]")} />
+            <RotateCw
+              className={cn("size-3.5", autoRotate && "animate-[holo-spin_2.5s_linear_infinite]")}
+            />
             {autoRotate ? "ROTATING" : "AUTO-ROTATE"}
           </button>
         </div>
@@ -281,7 +298,11 @@ function RigPanel({ equipped }: { equipped: Set<PartSlot> }) {
               </div>
             }
           >
-            <LazyRigCanvas equipped={equipped} autoRotate={autoRotate} />
+            <LazyRigCanvas
+              equipped={equipped}
+              equippedParts={equippedParts}
+              autoRotate={autoRotate}
+            />
           </Suspense>
         )}
         {mounted && webgl === false && Fallback && <Fallback equipped={equipped} />}
@@ -297,7 +318,10 @@ function RigPanel({ equipped }: { equipped: Set<PartSlot> }) {
         {SLOTS.filter((s) => s.core).map((s) => {
           const on = equipped.has(s.slot);
           return (
-            <span key={s.slot} className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.2em]">
+            <span
+              key={s.slot}
+              className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.2em]"
+            >
               <span
                 className={cn("size-1.5 rounded-full", on && "led-dot")}
                 style={on ? { color: "var(--holo-cyan)" } : { background: "#3a4552" }}
@@ -312,7 +336,9 @@ function RigPanel({ equipped }: { equipped: Set<PartSlot> }) {
 
       {/* armory inventory — owned parts, equip/unequip */}
       <div className="border-t border-[oklch(0.85_0.17_200/0.12)] px-4 py-3">
-        <HudLabel accent="amber" className="mb-2.5">Armory // Inventory</HudLabel>
+        <HudLabel accent="amber" className="mb-2.5">
+          Armory // Inventory
+        </HudLabel>
         {owned.length === 0 ? (
           <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground/60">
             <ShoppingCart className="size-3.5" />
@@ -351,12 +377,19 @@ function RigPanel({ equipped }: { equipped: Set<PartSlot> }) {
 }
 
 export function WorkbenchTab() {
-  const { credits, ownedParts, equippedParts, buyPart, sellPart, equipPart, unequipPart } = useApp();
+  const { credits, ownedParts, equippedParts, buyPart, sellPart, equipPart, unequipPart } =
+    useApp();
   const [query, setQuery] = useState("");
   const [slotFilter, setSlotFilter] = useState<PartSlot | "all">("all");
 
   const equipped = useMemo(
-    () => new Set(equippedParts.map(partById).filter(Boolean).map((p) => (p as HardwarePart).slot)),
+    () =>
+      new Set(
+        equippedParts
+          .map(partById)
+          .filter(Boolean)
+          .map((p) => (p as HardwarePart).slot),
+      ),
     [equippedParts],
   );
   const equippedIds = useMemo(() => new Set(equippedParts), [equippedParts]);

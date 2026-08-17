@@ -8,11 +8,13 @@ import { JarvisClock } from "../JarvisClock";
 import { cn } from "@/lib/utils";
 import { partById } from "@/lib/hardware";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useCountUpValue, useScanSweep, useTilt } from "@/hooks/useGsapMotion";
 
-function Radial({ value }: { value: number }) {
+function Radial({ value, mounted }: { value: number; mounted: boolean }) {
   const r = 40;
   const c = 2 * Math.PI * r;
-  const off = c - (value / 100) * c;
+  const anim = useCountUpValue(value, { duration: 1.1, disabled: !mounted });
+  const off = c - (anim / 100) * c;
   return (
     <svg width="100" height="100" viewBox="0 0 100 100" className="shrink-0">
       <circle cx="50" cy="50" r={r} stroke="oklch(1 1 1 / 0.08)" strokeWidth="8" fill="none" />
@@ -27,7 +29,7 @@ function Radial({ value }: { value: number }) {
         strokeDashoffset={off}
         strokeLinecap="round"
         transform="rotate(-90 50 50)"
-        style={{ transition: "stroke-dashoffset .6s ease" }}
+        style={{ transition: "stroke-dashoffset .25s linear" }}
       />
       <defs>
         <linearGradient id="dashg" x1="0" y1="0" x2="1" y2="1">
@@ -43,7 +45,7 @@ function Radial({ value }: { value: number }) {
         fontWeight="700"
         fill="var(--color-foreground)"
       >
-        {value}%
+        {Math.round(anim)}%
       </text>
     </svg>
   );
@@ -153,17 +155,40 @@ export function DashboardTab() {
   const hour = now?.getHours() ?? 0;
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
+  // Live counters (GSAP count-up).
+  const creditsAnim = useCountUpValue(mounted ? credits : 0, { duration: 1, disabled: !mounted });
+  const streakAnim = useCountUpValue(streak, { duration: 1, disabled: !mounted });
+  const earnedAnim = useCountUpValue(earnedToday, { duration: 1, disabled: !mounted });
+
+  // Scan sweep across the JARVIS banner + priority queue.
+  const bannerScan = useScanSweep<HTMLDivElement>(true, 5.5);
+  const queueScan = useScanSweep<HTMLDivElement>(true, 7.5);
+
+  const leftTilt = useTilt(5);
+  const rightTilt = useTilt(5);
+
   return (
     <div className="flex h-full min-h-0 flex-col gap-4">
       {/* JARVIS status banner */}
-      <div className="corner-brackets glass-panel cyber-grid relative shrink-0 overflow-hidden px-5 py-3.5">
+      <div
+        ref={bannerScan.ref}
+        className="corner-brackets glass-panel cyber-grid relative shrink-0 overflow-hidden px-5 py-3.5"
+      >
         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[oklch(0.85_0.17_200/0.5)] to-transparent" />
+        {/* scanning beam */}
+        <div
+          ref={bannerScan.beamRef}
+          className="pointer-events-none absolute inset-y-0 w-24 bg-gradient-to-r from-transparent via-[var(--holo-cyan)]/10 to-transparent"
+        />
         <div className="relative flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="font-mono text-[9px] font-bold uppercase tracking-[0.3em] text-[var(--holo-cyan)]">
               J.A.R.V.I.S. // Command Hub
             </div>
-            <div className="mt-1 text-lg font-bold leading-tight tracking-tight" suppressHydrationWarning>
+            <div
+              className="mt-1 text-lg font-bold leading-tight tracking-tight"
+              suppressHydrationWarning
+            >
               {greeting}, Sir — all systems nominal
             </div>
             <div
@@ -186,8 +211,11 @@ export function DashboardTab() {
             <StatusLine label="Rig Powered" on={rigPowered} color="var(--holo-green)" />
             <span className="flex items-center gap-1.5 rounded-full border border-[oklch(0.82_0.16_80/0.25)] bg-[oklch(0.82_0.16_80/0.07)] px-2.5 py-1">
               <Coins className="size-3.5 text-[var(--holo-amber)]" />
-              <span className="font-mono-tech text-sm font-bold tabular-nums text-[var(--holo-amber)]" suppressHydrationWarning>
-                {mounted ? credits : 0}
+              <span
+                className="font-mono-tech text-sm font-bold tabular-nums text-[var(--holo-amber)]"
+                suppressHydrationWarning
+              >
+                {Math.round(creditsAnim)}
               </span>
               <span className="text-[10px] text-muted-foreground">CR</span>
             </span>
@@ -198,17 +226,24 @@ export function DashboardTab() {
       {/* Main JARVIS stage */}
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-12">
         {/* Left — mission telemetry */}
-        <div className="flex flex-col gap-4 lg:col-span-3">
+        <div ref={leftTilt} className="flex flex-col gap-4 lg:col-span-3">
           <div className="glass-panel flex flex-col items-center justify-center gap-2 p-4">
             <HudLabel className="self-center">Mission Completion</HudLabel>
-            <Radial value={pct} />
+            <Radial value={pct} mounted={mounted} />
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span className="font-mono-tech text-base font-bold text-[var(--holo-amber)]">{streak}</span>
+              <span
+                className="font-mono-tech text-base font-bold text-[var(--holo-amber)]"
+                suppressHydrationWarning
+              >
+                {Math.round(streakAnim)}
+              </span>
               day streak
             </div>
           </div>
           <div className="glass-panel p-4">
-            <HudLabel accent="green" className="mb-3">Daily Namaz Cycle</HudLabel>
+            <HudLabel accent="green" className="mb-3">
+              Daily Namaz Cycle
+            </HudLabel>
             <div className="flex items-center justify-between">
               {PRAYERS.map((p) => {
                 const d = !!todayPrayers[p.name];
@@ -230,12 +265,20 @@ export function DashboardTab() {
                             : "border-[oklch(1_1_1/0.12)] bg-[oklch(1_1_1/0.03)]",
                       )}
                     >
-                      {d && <span className="flex h-full items-center justify-center text-[10px] text-[var(--holo-green)]">✓</span>}
+                      {d && (
+                        <span className="flex h-full items-center justify-center text-[10px] text-[var(--holo-green)]">
+                          ✓
+                        </span>
+                      )}
                     </span>
                     <span
                       className={cn(
                         "font-mono text-[8px] uppercase tracking-wider",
-                        d ? "text-[var(--holo-green)]" : isNext ? "text-[var(--holo-cyan)]" : "text-muted-foreground/60",
+                        d
+                          ? "text-[var(--holo-green)]"
+                          : isNext
+                            ? "text-[var(--holo-cyan)]"
+                            : "text-muted-foreground/60",
                       )}
                     >
                       {p.name}
@@ -250,10 +293,15 @@ export function DashboardTab() {
             </div>
           </div>
           <div className="glass-panel p-4">
-            <HudLabel accent="amber" className="mb-2">Credits Today</HudLabel>
+            <HudLabel accent="amber" className="mb-2">
+              Credits Today
+            </HudLabel>
             <div className="flex items-baseline gap-2">
-              <span className="font-mono-tech text-3xl font-bold tabular-nums text-[var(--holo-amber)]" suppressHydrationWarning>
-                +{earnedToday}
+              <span
+                className="font-mono-tech text-3xl font-bold tabular-nums text-[var(--holo-amber)]"
+                suppressHydrationWarning
+              >
+                +{Math.round(earnedAnim)}
               </span>
               <span className="text-xs text-muted-foreground">CR earned</span>
             </div>
@@ -270,9 +318,11 @@ export function DashboardTab() {
         </div>
 
         {/* Right — live beacons */}
-        <div className="flex flex-col gap-4 lg:col-span-3">
+        <div ref={rightTilt} className="flex flex-col gap-4 lg:col-span-3">
           <div className="glass-panel p-4">
-            <HudLabel accent="amber" className="mb-2">Schedule Beacon</HudLabel>
+            <HudLabel accent="amber" className="mb-2">
+              Schedule Beacon
+            </HudLabel>
             {beacon ? (
               <>
                 <div className="flex items-center justify-between gap-2">
@@ -286,7 +336,10 @@ export function DashboardTab() {
                 <div className="mt-0.5 font-mono text-[11px] text-muted-foreground">
                   {to12h(beacon.start)} → {to12h(beacon.end)}
                 </div>
-                <div className="mt-2 font-mono-tech text-3xl font-bold tabular-nums text-[var(--holo-amber)]" suppressHydrationWarning>
+                <div
+                  className="mt-2 font-mono-tech text-3xl font-bold tabular-nums text-[var(--holo-amber)]"
+                  suppressHydrationWarning
+                >
                   {beaconETA ?? "--:--:--"}
                 </div>
                 <div className="mt-0.5 font-mono text-[9px] uppercase tracking-[0.25em] text-muted-foreground/70">
@@ -301,7 +354,9 @@ export function DashboardTab() {
           </div>
 
           <div className="glass-panel p-4">
-            <HudLabel accent="green" className="mb-2">Next Prayer</HudLabel>
+            <HudLabel accent="green" className="mb-2">
+              Next Prayer
+            </HudLabel>
             {nextPrayer ? (
               <>
                 <div className="flex items-baseline gap-2">
@@ -310,7 +365,10 @@ export function DashboardTab() {
                     {to12h(nextPrayer.time)}
                   </span>
                 </div>
-                <div className="mt-1 font-mono-tech text-3xl font-bold tabular-nums text-[var(--holo-green)]" suppressHydrationWarning>
+                <div
+                  className="mt-1 font-mono-tech text-3xl font-bold tabular-nums text-[var(--holo-green)]"
+                  suppressHydrationWarning
+                >
                   {prayerETA}
                 </div>
                 <div className="mt-1 font-mono text-[9px] uppercase tracking-[0.25em] text-muted-foreground/70">
@@ -323,18 +381,33 @@ export function DashboardTab() {
           </div>
 
           <div className="glass-panel p-4">
-            <HudLabel accent="cyan" className="mb-2">Vizier Standing Orders</HudLabel>
+            <HudLabel accent="cyan" className="mb-2">
+              Vizier Standing Orders
+            </HudLabel>
             <ul className="space-y-1.5 text-[12px] leading-relaxed text-foreground/80">
-              <li className="flex gap-2"><span className="text-[var(--holo-cyan)]">▸</span> One mission at a time — deep focus.</li>
-              <li className="flex gap-2"><span className="text-[var(--holo-cyan)]">▸</span> Protect the namaz windows at all cost.</li>
-              <li className="flex gap-2"><span className="text-[var(--holo-cyan)]">▸</span> End the day with a 5/5 cycle &amp; banked credits.</li>
+              <li className="flex gap-2">
+                <span className="text-[var(--holo-cyan)]">▸</span> One mission at a time — deep
+                focus.
+              </li>
+              <li className="flex gap-2">
+                <span className="text-[var(--holo-cyan)]">▸</span> Protect the namaz windows at all
+                cost.
+              </li>
+              <li className="flex gap-2">
+                <span className="text-[var(--holo-cyan)]">▸</span> End the day with a 5/5 cycle
+                &amp; banked credits.
+              </li>
             </ul>
           </div>
         </div>
       </div>
 
       {/* Priority queue strip */}
-      <div className="glass-panel shrink-0 p-4">
+      <div ref={queueScan.ref} className="glass-panel relative shrink-0 overflow-hidden p-4">
+        <div
+          ref={queueScan.beamRef}
+          className="pointer-events-none absolute inset-y-0 w-24 bg-gradient-to-r from-transparent via-[var(--holo-violet)]/8 to-transparent"
+        />
         <div className="mb-3 flex items-center justify-between">
           <HudLabel accent="violet">Priority Queue</HudLabel>
           <span className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground">
@@ -395,7 +468,9 @@ function PriorityChip({ p }: { p: "low" | "medium" | "high" | "critical" }) {
     critical: "border-[oklch(0.72_0.24_350/0.5)] text-[var(--holo-pink)]",
   } as const;
   return (
-    <span className={`shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-medium capitalize ${map[p]}`}>
+    <span
+      className={`shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-medium capitalize ${map[p]}`}
+    >
       {p}
     </span>
   );

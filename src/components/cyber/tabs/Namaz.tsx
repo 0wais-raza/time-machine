@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, History as HistoryIcon, MapPin, RefreshCw, Moon } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  History as HistoryIcon,
+  MapPin,
+  RefreshCw,
+  Moon,
+} from "lucide-react";
 import { useApp, PRAYERS, todayStr } from "@/lib/store";
 import { PanelHeader } from "../PanelHeader";
 import { HudLabel } from "../HudLabel";
@@ -13,11 +20,20 @@ import { toast } from "sonner";
 // Approximate Hijri conversion (Umm al-Qura algorithm approximation)
 function toHijri(date: Date): { day: number; month: string; year: number } {
   const months = [
-    "Muharram","Safar","Rabi' al-Awwal","Rabi' al-Thani","Jumada al-Awwal",
-    "Jumada al-Thani","Rajab","Sha'ban","Ramadan","Shawwal","Dhu al-Qi'dah","Dhu al-Hijjah",
+    "Muharram",
+    "Safar",
+    "Rabi' al-Awwal",
+    "Rabi' al-Thani",
+    "Jumada al-Awwal",
+    "Jumada al-Thani",
+    "Rajab",
+    "Sha'ban",
+    "Ramadan",
+    "Shawwal",
+    "Dhu al-Qi'dah",
+    "Dhu al-Hijjah",
   ];
-  const jd =
-    Math.floor((date.getTime() - Date.UTC(1970, 0, 1)) / 86400000) + 2440588;
+  const jd = Math.floor((date.getTime() - Date.UTC(1970, 0, 1)) / 86400000) + 2440588;
   const l = jd - 1948440 + 10632;
   const n = Math.floor((l - 1) / 10631);
   const l2 = l - 10631 * n + 354;
@@ -149,10 +165,16 @@ export function NamazTab() {
         <div className="relative grid gap-5 md:grid-cols-3">
           {/* Hijri */}
           <div>
-            <HudLabel accent="cyan" className="mb-2">Hijri Date</HudLabel>
-            <div className="text-3xl font-bold tracking-tight">{hijri.day} {hijri.month}</div>
+            <HudLabel accent="cyan" className="mb-2">
+              Hijri Date
+            </HudLabel>
+            <div className="text-3xl font-bold tracking-tight">
+              {hijri.day} {hijri.month}
+            </div>
             <div className="font-mono text-sm text-[var(--holo-cyan)]">{hijri.year} AH</div>
-            <div className="mt-1.5 text-[11px] uppercase tracking-[0.2em] text-muted-foreground">{greg}</div>
+            <div className="mt-1.5 text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
+              {greg}
+            </div>
           </div>
           {/* Live countdown */}
           <div className="flex flex-col justify-center md:border-l md:border-[oklch(1_1_1/0.07)] md:pl-5">
@@ -197,9 +219,22 @@ export function NamazTab() {
                       {isNext && (
                         <span className="pointer-events-none absolute -inset-[3px] animate-[holo-spin_3s_linear_infinite] rounded-full border border-dashed border-[oklch(0.85_0.17_200/0.6)]" />
                       )}
-                      {done && <span className="absolute inset-0 flex items-center justify-center text-[10px] text-[var(--holo-green)]">✓</span>}
+                      {done && (
+                        <span className="absolute inset-0 flex items-center justify-center text-[10px] text-[var(--holo-green)]">
+                          ✓
+                        </span>
+                      )}
                     </span>
-                    <span className={cn("font-mono text-[8px] uppercase tracking-wider", done ? "text-[var(--holo-green)]" : isNext ? "text-[var(--holo-cyan)]" : "text-muted-foreground/60")}>
+                    <span
+                      className={cn(
+                        "font-mono text-[8px] uppercase tracking-wider",
+                        done
+                          ? "text-[var(--holo-green)]"
+                          : isNext
+                            ? "text-[var(--holo-cyan)]"
+                            : "text-muted-foreground/60",
+                      )}
+                    >
                       {p.name}
                     </span>
                   </div>
@@ -290,12 +325,23 @@ export function NamazTab() {
               {isNext && (
                 <span className="pointer-events-none absolute -inset-[2px] animate-[holo-spin_4s_linear_infinite] rounded-[inherit] border border-dashed border-[oklch(0.85_0.17_200/0.45)]" />
               )}
-              <Moon className={cn("size-5", done ? "text-[var(--holo-green)]" : isNext ? "text-[var(--holo-cyan)]" : "text-muted-foreground/60")} />
+              <Moon
+                className={cn(
+                  "size-5",
+                  done
+                    ? "text-[var(--holo-green)]"
+                    : isNext
+                      ? "text-[var(--holo-cyan)]"
+                      : "text-muted-foreground/60",
+                )}
+              />
               <div className="text-sm font-bold">{p.name}</div>
               <div className="font-mono text-xs text-muted-foreground">
                 {to12h(t)}
                 {liveTimes[p.name] && (
-                  <span className="ml-1 text-[8px] uppercase tracking-widest text-[var(--holo-cyan)]">live</span>
+                  <span className="ml-1 text-[8px] uppercase tracking-widest text-[var(--holo-cyan)]">
+                    live
+                  </span>
                 )}
               </div>
               <div
@@ -315,30 +361,71 @@ export function NamazTab() {
         })}
       </div>
 
-      {/* History */}
-      <div className="glass-panel p-5">
-        <HudLabel accent="violet" className="mb-4">14-Day History</HudLabel>
-        <div className="grid grid-cols-7 gap-2">
+      {/* History — compact horizontal heat-strip (scannable, one row) */}
+      <div className="glass-panel p-4">
+        <HudLabel accent="violet" className="mb-3">
+          14-Day History
+        </HudLabel>
+        <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
           {days.map((d) => {
             const count = PRAYERS.filter((p) => prayers[d]?.[p.name]).length;
             const isSel = d === selectedDate;
+            const isToday = d === today;
+            const dow = new Date(d + "T12:00:00")
+              .toLocaleDateString("en-US", { weekday: "short" })
+              .slice(0, 2)
+              .toUpperCase();
             return (
               <button
                 key={d}
                 onClick={() => setSelectedDate(d)}
                 className={cn(
-                  "aspect-square rounded-md border text-xs flex flex-col items-center justify-center transition",
+                  "group relative flex w-[46px] shrink-0 flex-col items-center gap-1 rounded-md border px-1.5 py-2 transition-all",
                   isSel
-                    ? "border-[var(--holo-cyan)] bg-[oklch(0.85_0.17_200/0.12)] shadow-[0_0_12px_oklch(0.85_0.17_200/0.25)]"
-                    : "border-[oklch(1_1_1/0.07)] hover:border-muted-foreground",
-                  count === 5 && !isSel && "border-[oklch(0.8_0.16_155/0.35)]",
+                    ? "border-[var(--holo-cyan)] bg-[oklch(0.85_0.17_200/0.12)] shadow-[0_0_14px_oklch(0.85_0.17_200/0.3)]"
+                    : "border-[oklch(1_1_1/0.06)] bg-[oklch(1_1_1/0.015)] hover:border-[oklch(0.85_0.17_200/0.35)] hover:bg-[oklch(0.85_0.17_200/0.05)]",
                 )}
               >
-                <span className="font-bold">{new Date(d).getDate()}</span>
+                <span className="flex items-center gap-1">
+                  <span className="font-mono text-[8px] uppercase tracking-wider text-muted-foreground/60">
+                    {dow}
+                  </span>
+                  <span
+                    className={cn(
+                      "text-xs font-bold tabular-nums",
+                      isSel
+                        ? "text-[var(--holo-cyan)]"
+                        : isToday
+                          ? "text-[var(--holo-green)]"
+                          : "text-foreground/85",
+                    )}
+                  >
+                    {new Date(d).getDate()}
+                  </span>
+                </span>
+                {/* 5-segment prayer progress */}
+                <span className="flex gap-[2px]">
+                  {PRAYERS.map((p) => {
+                    const on = !!prayers[d]?.[p.name];
+                    return (
+                      <span
+                        key={p.name}
+                        className={cn(
+                          "h-3 w-[5px] rounded-[1px] transition-all",
+                          on
+                            ? isSel
+                              ? "bg-[var(--holo-cyan)] shadow-[0_0_5px_oklch(0.85_0.17_200/0.6)]"
+                              : "bg-[var(--holo-green)]"
+                            : "bg-[oklch(1_1_1/0.1)]",
+                        )}
+                      />
+                    );
+                  })}
+                </span>
                 <span
                   className={cn(
-                    "mt-0.5 font-mono text-[10px]",
-                    count === 5 ? "text-[var(--holo-green)]" : "text-muted-foreground",
+                    "font-mono text-[8.5px] tabular-nums",
+                    count === 5 ? "text-[var(--holo-green)]" : "text-muted-foreground/60",
                   )}
                 >
                   {count}/5
@@ -347,8 +434,8 @@ export function NamazTab() {
             );
           })}
         </div>
-        <p className="mt-4 text-xs text-muted-foreground">
-          Select any day to edit or fill missed prayers.
+        <p className="mt-2.5 text-[11px] text-muted-foreground">
+          Tap a day to audit or fill missed prayers · green segment = logged
         </p>
       </div>
     </div>

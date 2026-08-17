@@ -1,11 +1,17 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useApp, type Priority } from "@/lib/store";
 import { PanelHeader } from "../PanelHeader";
 import { HudLabel } from "../HudLabel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Plus,
   Trash2,
@@ -22,37 +28,42 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useNow } from "@/lib/clock";
+import { useCountUpValue } from "@/hooks/useGsapMotion";
 
 const PRIORITIES: Priority[] = ["low", "medium", "high", "critical"];
 
-const PRIORITY_STYLE: Record<Priority, { bar: string; text: string; chip: string; glow: string }> = {
-  low: {
-    bar: "bg-muted-foreground/40",
-    text: "text-muted-foreground",
-    chip: "border-[oklch(1_1_1/0.12)] text-muted-foreground",
-    glow: "border-[oklch(1_1_1/0.06)]",
-  },
-  medium: {
-    bar: "bg-[var(--holo-cyan)]",
-    text: "text-[var(--holo-cyan)]",
-    chip: "border-[oklch(0.85_0.17_200/0.4)] text-[var(--holo-cyan)]",
-    glow: "border-[oklch(0.85_0.17_200/0.18)]",
-  },
-  high: {
-    bar: "bg-[var(--holo-violet)]",
-    text: "text-[var(--holo-violet)]",
-    chip: "border-[oklch(0.66_0.27_295/0.5)] text-[var(--holo-violet)]",
-    glow: "border-[oklch(0.66_0.27_295/0.2)]",
-  },
-  critical: {
-    bar: "bg-[var(--holo-pink)]",
-    text: "text-[var(--holo-pink)]",
-    chip: "border-[oklch(0.72_0.24_350/0.5)] text-[var(--holo-pink)]",
-    glow: "border-[oklch(0.72_0.24_350/0.25)]",
-  },
-};
+const PRIORITY_STYLE: Record<Priority, { bar: string; text: string; chip: string; glow: string }> =
+  {
+    low: {
+      bar: "bg-muted-foreground/40",
+      text: "text-muted-foreground",
+      chip: "border-[oklch(1_1_1/0.12)] text-muted-foreground",
+      glow: "border-[oklch(1_1_1/0.06)]",
+    },
+    medium: {
+      bar: "bg-[var(--holo-cyan)]",
+      text: "text-[var(--holo-cyan)]",
+      chip: "border-[oklch(0.85_0.17_200/0.4)] text-[var(--holo-cyan)]",
+      glow: "border-[oklch(0.85_0.17_200/0.18)]",
+    },
+    high: {
+      bar: "bg-[var(--holo-violet)]",
+      text: "text-[var(--holo-violet)]",
+      chip: "border-[oklch(0.66_0.27_295/0.5)] text-[var(--holo-violet)]",
+      glow: "border-[oklch(0.66_0.27_295/0.2)]",
+    },
+    critical: {
+      bar: "bg-[var(--holo-pink)]",
+      text: "text-[var(--holo-pink)]",
+      chip: "border-[oklch(0.72_0.24_350/0.5)] text-[var(--holo-pink)]",
+      glow: "border-[oklch(0.72_0.24_350/0.25)]",
+    },
+  };
 
-function dueLabel(dueDate: string | undefined, now: Date): { text: string; danger: boolean } | null {
+function dueLabel(
+  dueDate: string | undefined,
+  now: Date,
+): { text: string; danger: boolean } | null {
   if (!dueDate) return null;
   const diffMs = new Date(dueDate).getTime() - now.getTime();
   const mins = Math.round(diffMs / 60000);
@@ -66,12 +77,28 @@ function dueLabel(dueDate: string | undefined, now: Date): { text: string; dange
   };
 }
 
-function Stat({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent?: string }) {
+function Stat({
+  label,
+  value,
+  sub,
+  accent,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  accent?: string;
+}) {
   return (
     <div className="glass-panel px-4 py-3">
-      <div className="font-mono text-[9px] uppercase tracking-[0.25em] text-muted-foreground">{label}</div>
+      <div className="font-mono text-[9px] uppercase tracking-[0.25em] text-muted-foreground">
+        {label}
+      </div>
       <div className="mt-1.5 flex items-baseline gap-2">
-        <span className={cn("font-mono-tech text-[22px] font-bold tabular-nums leading-none", accent)}>{value}</span>
+        <span
+          className={cn("font-mono-tech text-[22px] font-bold tabular-nums leading-none", accent)}
+        >
+          {value}
+        </span>
         {sub && <span className="truncate text-[11px] text-muted-foreground">{sub}</span>}
       </div>
     </div>
@@ -94,7 +121,8 @@ export function TodoTab() {
   const filtered = useMemo(() => {
     return tasks.filter((t) => {
       if (filter !== "all" && t.priority !== filter) return false;
-      if (q && !`${t.title} ${t.tags.join(" ")}`.toLowerCase().includes(q.toLowerCase())) return false;
+      if (q && !`${t.title} ${t.tags.join(" ")}`.toLowerCase().includes(q.toLowerCase()))
+        return false;
       return true;
     });
   }, [tasks, q, filter]);
@@ -107,8 +135,18 @@ export function TodoTab() {
   const done = tasks.filter((t) => t.done).length;
   const pct = Math.round((done / Math.max(1, tasks.length)) * 100);
 
+  // GSAP count-up telemetry.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const openAnim = useCountUpValue(open, { duration: 0.9, disabled: !mounted });
+  const criticalAnim = useCountUpValue(critical, { duration: 0.9, disabled: !mounted });
+  const doneTodayAnim = useCountUpValue(doneToday, { duration: 0.9, disabled: !mounted });
+  const pctAnim = useCountUpValue(pct, { duration: 1.1, disabled: !mounted });
+  const doneAnim = useCountUpValue(done, { duration: 1.1, disabled: !mounted });
+
   const overdue = useMemo(
-    () => filtered.filter((t) => !t.done && t.dueDate && new Date(t.dueDate).getTime() < Date.now()),
+    () =>
+      filtered.filter((t) => !t.done && t.dueDate && new Date(t.dueDate).getTime() < Date.now()),
     [filtered],
   );
   const openGrouped = useMemo(() => {
@@ -127,7 +165,10 @@ export function TodoTab() {
       title: title.trim(),
       description: desc.trim() || undefined,
       priority,
-      tags: tags.split(",").map((s) => s.trim()).filter(Boolean),
+      tags: tags
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
       dueDate: due ? new Date(due).toISOString() : undefined,
       estimatedMinutes: duration ? Math.max(1, parseInt(duration, 10)) : undefined,
     });
@@ -177,7 +218,9 @@ export function TodoTab() {
               value={t.priority}
               onValueChange={(v) => updateTask(t.id, { priority: v as Priority })}
             >
-              <SelectTrigger className={cn("h-6 w-[92px] border text-[10px] uppercase tracking-widest", st.chip)}>
+              <SelectTrigger
+                className={cn("h-6 w-[92px] border text-[10px] uppercase tracking-widest", st.chip)}
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -206,21 +249,30 @@ export function TodoTab() {
             )}
 
             {t.tags.length > 0 && (
-              <span className="flex items-center gap-1 rounded-md border border-border bg-black/30 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground" title="Tags">
+              <span
+                className="flex items-center gap-1 rounded-md border border-border bg-black/30 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+                title="Tags"
+              >
                 <Tag className="size-3" />
                 {t.tags.join(", ")}
               </span>
             )}
 
             {typeof t.estimatedMinutes === "number" && (
-              <span className="flex items-center gap-1 rounded-md border border-border bg-black/30 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground" title="Estimated duration">
+              <span
+                className="flex items-center gap-1 rounded-md border border-border bg-black/30 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+                title="Estimated duration"
+              >
                 <Timer className="size-3" />
                 {t.estimatedMinutes}m
               </span>
             )}
 
             {typeof t.actualMinutes === "number" && t.actualMinutes > 0 && (
-              <span className="flex items-center gap-1 rounded-md border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground" title="Logged focus time">
+              <span
+                className="flex items-center gap-1 rounded-md border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+                title="Logged focus time"
+              >
                 <CheckCircle2 className="size-3" />
                 {t.actualMinutes}m logged
               </span>
@@ -231,8 +283,15 @@ export function TodoTab() {
                 className="flex items-center gap-1 rounded-md border border-[oklch(0.82_0.16_80/0.35)] bg-[oklch(0.82_0.16_80/0.07)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--holo-amber)]"
                 title="Credits on completion"
               >
-                <Zap className="size-3" />
-                +{t.priority === "critical" ? 8 : t.priority === "high" ? 5 : t.priority === "medium" ? 3 : 1} CR
+                <Zap className="size-3" />+
+                {t.priority === "critical"
+                  ? 8
+                  : t.priority === "high"
+                    ? 5
+                    : t.priority === "medium"
+                      ? 3
+                      : 1}{" "}
+                CR
               </span>
             )}
             {t.done && typeof t.credits === "number" && (
@@ -274,23 +333,43 @@ export function TodoTab() {
 
       {/* Telemetry */}
       <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Stat label="Open Missions" value={String(open)} accent="text-[var(--holo-cyan)]" />
-        <Stat label="Critical" value={String(critical)} accent="text-[var(--holo-pink)]" sub={critical ? "execute now" : undefined} />
-        <Stat label="Done Today" value={String(doneToday)} accent="text-[var(--holo-green)]" />
-        <Stat label="Completion" value={`${pct}%`} sub={`${done}/${tasks.length}`} accent="text-[var(--holo-violet)]" />
+        <Stat
+          label="Open Missions"
+          value={String(Math.round(openAnim))}
+          accent="text-[var(--holo-cyan)]"
+        />
+        <Stat
+          label="Critical"
+          value={String(Math.round(criticalAnim))}
+          accent="text-[var(--holo-pink)]"
+          sub={critical ? "execute now" : undefined}
+        />
+        <Stat
+          label="Done Today"
+          value={String(Math.round(doneTodayAnim))}
+          accent="text-[var(--holo-green)]"
+        />
+        <Stat
+          label="Completion"
+          value={`${Math.round(pctAnim)}%`}
+          sub={`${Math.round(doneAnim)}/${tasks.length}`}
+          accent="text-[var(--holo-violet)]"
+        />
       </div>
 
       {/* Progress rail */}
       <div className="mb-4 h-1 overflow-hidden rounded-full bg-[oklch(1_1_1/0.06)]">
         <div
           className="h-full rounded-full bg-gradient-to-r from-[var(--holo-cyan)] to-[var(--holo-violet)] shadow-[0_0_8px_oklch(0.85_0.17_200/0.5)] transition-all duration-500"
-          style={{ width: `${pct}%` }}
+          style={{ width: `${mounted ? pctAnim : 0}%` }}
         />
       </div>
 
       {/* Directive intake */}
       <div className="glass-panel mb-4 p-4">
-        <HudLabel accent="cyan" className="mb-3">Directive Intake</HudLabel>
+        <HudLabel accent="cyan" className="mb-3">
+          Directive Intake
+        </HudLabel>
         <div className="grid gap-3 md:grid-cols-12">
           <Input
             className="md:col-span-3"
@@ -393,7 +472,12 @@ export function TodoTab() {
         {openGrouped.map(({ p, items }) => (
           <section key={p}>
             <div className="mb-2 flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[var(--holo-cyan)]">
-              <span className={cn("size-1.5 rounded-full", p === "critical" ? "bg-[var(--holo-pink)]" : "bg-[var(--holo-cyan)]")} />
+              <span
+                className={cn(
+                  "size-1.5 rounded-full",
+                  p === "critical" ? "bg-[var(--holo-pink)]" : "bg-[var(--holo-cyan)]",
+                )}
+              />
               {p} priority ({items.length})
               <span className="h-px flex-1 bg-gradient-to-r from-[oklch(0.85_0.17_200/0.25)] to-transparent" />
             </div>
@@ -414,7 +498,11 @@ export function TodoTab() {
               onClick={() => setShowCompleted((v) => !v)}
               className="mb-2 flex w-full items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-muted-foreground transition hover:text-foreground"
             >
-              {showCompleted ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
+              {showCompleted ? (
+                <ChevronDown className="size-3.5" />
+              ) : (
+                <ChevronRight className="size-3.5" />
+              )}
               Completed ({completed.length})
               <span className="h-px flex-1 bg-gradient-to-r from-muted-foreground/25 to-transparent" />
             </button>
