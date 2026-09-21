@@ -25,6 +25,8 @@ npm install
 npm run dev
 ```
 
+lets chek is it really working?
+
 Other scripts: `npm run build` (production), `npm run typecheck`, `npm run lint`.
 
 ## The OpenRouter API key (client-side, secured)
