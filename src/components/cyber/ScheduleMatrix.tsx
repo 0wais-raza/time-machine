@@ -20,9 +20,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, Copy, Check } from "lucide-react";
+import { Plus, Trash2, Copy, Check, GraduationCap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HudLabel } from "./HudLabel";
+import { SubjectSelect } from "./StudyPlanner";
 
 const HOUR_PX = 48;
 const SNAP_MIN = 15;
@@ -92,6 +93,10 @@ function BlockCard({
     id: block.id,
     data: { block },
   });
+  const examSubjects = useApp((s) => s.examSubjects);
+  const subject = block.subjectId
+    ? examSubjects.find((x) => x.id === block.subjectId)
+    : undefined;
   const start = toMins(block.start);
   const end = toMins(block.end);
   const top = (start / 60) * HOUR_PX;
@@ -180,6 +185,15 @@ function BlockCard({
         >
           {block.title}
         </div>
+        {subject && (
+          <span
+            className="ml-auto flex shrink-0 items-center gap-0.5 rounded border border-current/30 px-1 py-px font-mono text-[8px] uppercase tracking-wider opacity-90"
+            title="Exam subject"
+          >
+            <GraduationCap className="size-2.5" />
+            {subject.name.slice(0, 10)}
+          </span>
+        )}
       </div>
       <div className="font-mono text-[10px] opacity-80 leading-tight">
         {to12h(block.start)} – {to12h(block.end)}
@@ -517,6 +531,7 @@ function BlockEditor({
   const [end, setEnd] = useState(block.end);
   const [day, setDay] = useState<number>(blockDay(block));
   const [color, setColor] = useState(block.color ?? "");
+  const [subjectId, setSubjectId] = useState<string | undefined>(block.subjectId);
 
   return (
     <div
@@ -584,6 +599,9 @@ function BlockEditor({
             ))}
           </div>
         </div>
+        {category === "study" && (
+          <SubjectSelect value={subjectId} onChange={setSubjectId} />
+        )}
         <div className="flex items-center justify-between pt-2">
           <Button variant="ghost" size="sm" onClick={onDelete} className="text-[var(--holo-pink)]">
             <Trash2 className="size-4 mr-1" /> Delete
@@ -593,7 +611,7 @@ function BlockEditor({
             <Button
               size="sm"
               onClick={() =>
-                onSave({ title, category, start, end, dayOfWeek: day, color })
+                onSave({ title, category, start, end, dayOfWeek: day, color, subjectId })
               }
             >
               Save

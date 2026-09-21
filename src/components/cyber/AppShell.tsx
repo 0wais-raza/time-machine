@@ -21,6 +21,8 @@ import { buildUpcomingEvents } from "@/lib/scheduler";
 import { to12h } from "@/lib/clock";
 import { fetchPrayerTimes } from "@/lib/prayerTimes";
 import { resolveDayTimes } from "@/lib/prayerResolve";
+import { startAlarmEngine } from "@/lib/alarms";
+import { AlarmRinger } from "./AlarmRinger";
 
 const MILESTONES = [25, 50, 75, 100];
 
@@ -58,6 +60,11 @@ export function AppShell() {
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [coords?.lat, coords?.lon]);
+
+  // Alarm engine heartbeat (10s tick; fires ringtones on block/prayer triggers).
+  useEffect(() => {
+    startAlarmEngine();
+  }, []);
 
   // Milestone notifications.
   const lastPctRef = useRef<number>(0);
@@ -299,6 +306,7 @@ export function AppShell() {
         </main>
       </div>
       <JarvisOrb />
+      <AlarmRinger />
       <Celebration />
       <Toaster theme="dark" />
       <FocusOverlay />

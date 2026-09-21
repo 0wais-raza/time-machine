@@ -38,6 +38,7 @@ import { tzName } from "@/lib/clock";
 import { HudLabel } from "../HudLabel";
 import { cn } from "@/lib/utils";
 import { usePageEntrance } from "@/hooks/useGsapMotion";
+import { AlarmSettingsPanel } from "../AlarmSettingsPanel";
 
 export function SettingsTab() {
   const {
@@ -282,6 +283,9 @@ export function SettingsTab() {
             or use a native wrapper (Web Push needs a push server).
           </p>
         </div>
+
+        {/* Alarm system — ringtone, volume, triggers */}
+        <AlarmSettingsPanel />
 
         <div className="glass-panel relative p-5">
           <span className="pointer-events-none absolute left-0 top-0 size-2.5 border-l-2 border-t-2 border-[var(--holo-violet)/50]" />

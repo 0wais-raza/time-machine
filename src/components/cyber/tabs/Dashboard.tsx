@@ -1,7 +1,7 @@
 import { useApp, PRAYERS, todayStr } from "@/lib/store";
 import { HudLabel } from "../HudLabel";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Coins, Timer, AlertTriangle, Zap } from "lucide-react";
+import { Coins, Timer, AlertTriangle, Zap, Target, Play, BellRing } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNow, to12h } from "@/lib/clock";
 import { JarvisClock } from "../JarvisClock";
@@ -10,6 +10,8 @@ import { partById } from "@/lib/hardware";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useCountUpValue, useScanSweep, useTilt } from "@/hooks/useGsapMotion";
 import { resolveDayTimes } from "@/lib/prayerResolve";
+import { DailyGoals } from "../DailyGoals";
+import { ExamCountdownStrip } from "../StudyPlanner";
 
 function Radial({ value, mounted }: { value: number; mounted: boolean }) {
   const r = 40;
@@ -71,13 +73,14 @@ export function DashboardTab() {
     prayers,
     prayerTimes,
     customPrayerTimes,
-    toggleTask,
     togglePrayer,
     credits,
     creditHistory,
     streak: persistedStreak,
     notificationsEnabled,
     equippedParts,
+    setActiveTab,
+    examSubjects,
   } = useApp();
   const rigPowered = equippedParts.some((id) => partById(id)?.slot === "psu");
   const isMobile = useIsMobile();
@@ -166,29 +169,42 @@ export function DashboardTab() {
   const bannerScan = useScanSweep<HTMLDivElement>(true, 5.5);
   const queueScan = useScanSweep<HTMLDivElement>(true, 7.5);
 
-  const leftTilt = useTilt(5);
-  const rightTilt = useTilt(5);
+  const leftTilt = useTilt(4);
+  const rightTilt = useTilt(4);
+
+  // Next exam subject for the hero strip.
+  const nextExam = useMemo(() => {
+    return [...examSubjects]
+      .map((s) => ({
+        s,
+        d: s.examDate
+          ? Math.ceil((new Date(s.examDate + "T23:59:59").getTime() - Date.now()) / 86400000)
+          : null,
+      }))
+      .filter((x) => x.d !== null && x.d >= 0)
+      .sort((a, b) => (a.d ?? 0) - (b.d ?? 0))[0];
+  }, [examSubjects]);
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-4">
-      {/* JARVIS status banner */}
+      {/* ══ HERO — command status band (namaz-hero language) ══ */}
       <div
         ref={bannerScan.ref}
-        className="corner-brackets glass-panel cyber-grid relative shrink-0 overflow-hidden px-5 py-3.5"
+        className="glass-panel cyber-grid corner-brackets relative shrink-0 overflow-hidden px-5 py-4"
       >
         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[oklch(0.85_0.17_200/0.5)] to-transparent" />
-        {/* scanning beam */}
         <div
           ref={bannerScan.beamRef}
           className="pointer-events-none absolute inset-y-0 w-24 bg-gradient-to-r from-transparent via-[var(--holo-cyan)]/10 to-transparent"
         />
-        <div className="relative flex flex-wrap items-center justify-between gap-3">
-          <div>
+        <div className="relative flex flex-wrap items-center justify-between gap-4">
+          <div className="min-w-0">
             <div className="font-mono text-[9px] font-bold uppercase tracking-[0.3em] text-[var(--holo-cyan)]">
+              <span className="led-dot mr-2 size-1.5" style={{ color: "var(--holo-cyan)" }} />
               J.A.R.V.I.S. // Command Hub
             </div>
             <div
-              className="mt-1 text-lg font-bold leading-tight tracking-tight"
+              className="mt-1 text-xl font-bold leading-tight tracking-tight"
               suppressHydrationWarning
             >
               {greeting}, Sir — all systems nominal
@@ -211,6 +227,9 @@ export function DashboardTab() {
             <StatusLine label="Core Online" on color="var(--holo-cyan)" />
             <StatusLine label="Broadcast" on={notificationsEnabled} color="var(--holo-green)" />
             <StatusLine label="Rig Powered" on={rigPowered} color="var(--holo-green)" />
+            {nextExam && (
+              <ExamCountdownStrip />
+            )}
             <span className="flex items-center gap-1.5 rounded-full border border-[oklch(0.82_0.16_80/0.25)] bg-[oklch(0.82_0.16_80/0.07)] px-2.5 py-1">
               <Coins className="size-3.5 text-[var(--holo-amber)]" />
               <span
@@ -225,7 +244,7 @@ export function DashboardTab() {
         </div>
       </div>
 
-      {/* Main JARVIS stage */}
+      {/* ══ MAIN STAGE ══ */}
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-12">
         {/* Left — mission telemetry */}
         <div ref={leftTilt} className="flex flex-col gap-4 lg:col-span-3">
@@ -259,7 +278,7 @@ export function DashboardTab() {
                   >
                     <span
                       className={cn(
-                        "relative size-7 rounded-full border transition-all",
+                        "relative size-7 rounded-full border transition-all duration-200",
                         d
                           ? "border-[var(--holo-green)] bg-[oklch(0.8_0.16_155/0.15)] shadow-[0_0_10px_oklch(0.8_0.16_155/0.4)]"
                           : isNext
@@ -413,7 +432,84 @@ export function DashboardTab() {
         </div>
       </div>
 
-      {/* Priority queue strip */}
+      {/* ══ LOWER DECK — goals + quick actions ══ */}
+      <div className="grid shrink-0 grid-cols-1 gap-4 xl:grid-cols-12">
+        <div className="xl:col-span-5">
+          <DailyGoals compact />
+        </div>
+        <div className="glass-panel flex flex-col justify-center gap-2.5 p-4 xl:col-span-3">
+          <HudLabel accent="violet" className="mb-1">
+            Quick Actions
+          </HudLabel>
+          <button
+            onClick={() => setActiveTab("todo")}
+            className="clip-angular flex items-center gap-2 border border-[oklch(0.85_0.17_200/0.25)] bg-[oklch(0.85_0.17_200/0.06)] px-3 py-2 text-xs font-medium text-[var(--holo-cyan)] transition hover:bg-[oklch(0.85_0.17_200/0.14)]"
+          >
+            <Target className="size-3.5" /> Issue new mission
+          </button>
+          <button
+            onClick={() => setActiveTab("schedule")}
+            className="clip-angular flex items-center gap-2 border border-[oklch(0.66_0.27_295/0.3)] bg-[oklch(0.66_0.27_295/0.06)] px-3 py-2 text-xs font-medium text-[var(--holo-violet)] transition hover:bg-[oklch(0.66_0.27_295/0.14)]"
+          >
+            <Timer className="size-3.5" /> Plan study block
+          </button>
+          <button
+            onClick={() => setActiveTab("vizier")}
+            className="clip-angular flex items-center gap-2 border border-[oklch(0.82_0.16_80/0.3)] bg-[oklch(0.82_0.16_80/0.06)] px-3 py-2 text-xs font-medium text-[var(--holo-amber)] transition hover:bg-[oklch(0.82_0.16_80/0.14)]"
+          >
+            <Zap className="size-3.5" /> Ask J.A.R.V.I.S.
+          </button>
+        </div>
+        <div className="glass-panel flex flex-col justify-center p-4 xl:col-span-4">
+          <HudLabel accent="green" className="mb-2">
+            System Pulse
+          </HudLabel>
+          <div className="grid grid-cols-3 gap-3 text-center">
+            <div>
+              <div
+                className="font-mono-tech text-xl font-bold tabular-nums text-[var(--holo-cyan)]"
+                suppressHydrationWarning
+              >
+                {tasks.filter((t) => !t.done).length}
+              </div>
+              <div className="font-mono text-[8px] uppercase tracking-[0.2em] text-muted-foreground">
+                Open missions
+              </div>
+            </div>
+            <div>
+              <div
+                className="font-mono-tech text-xl font-bold tabular-nums text-[var(--holo-violet)]"
+                suppressHydrationWarning
+              >
+                {blocks.filter((b) => {
+                  const d = typeof b.dayOfWeek === "number" ? b.dayOfWeek : new Date(b.date).getDay();
+                  return d === (now?.getDay() ?? 0);
+                }).length}
+              </div>
+              <div className="font-mono text-[8px] uppercase tracking-[0.2em] text-muted-foreground">
+                Blocks today
+              </div>
+            </div>
+            <div>
+              <div
+                className="font-mono-tech text-xl font-bold tabular-nums text-[var(--holo-green)]"
+                suppressHydrationWarning
+              >
+                {prayerDone}/5
+              </div>
+              <div className="font-mono text-[8px] uppercase tracking-[0.2em] text-muted-foreground">
+                Namaz cycle
+              </div>
+            </div>
+          </div>
+          <div className="mt-3 flex items-center justify-center gap-2 border-t border-[oklch(1_1_1/0.06)] pt-2.5 font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground/70">
+            <BellRing className="size-3" />
+            {notificationsEnabled ? "Broadcast live" : "Broadcast offline — arm in System Core"}
+          </div>
+        </div>
+      </div>
+
+      {/* ══ Priority queue strip ══ */}
       <div ref={queueScan.ref} className="glass-panel relative shrink-0 overflow-hidden p-4">
         <div
           ref={queueScan.beamRef}
@@ -444,7 +540,7 @@ export function DashboardTab() {
                       : "border-[oklch(1_1_1/0.05)] bg-[oklch(1_1_1/0.02)]",
                   )}
                 >
-                  <Checkbox checked={t.done} onCheckedChange={() => toggleTask(t.id)} />
+                  <Checkbox checked={t.done} onCheckedChange={() => useApp.getState().toggleTask(t.id)} />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm text-foreground/90">{t.title}</div>
                     <div className="mt-0.5 flex items-center gap-2">
@@ -461,6 +557,13 @@ export function DashboardTab() {
                       )}
                     </div>
                   </div>
+                  <button
+                    onClick={() => setActiveTab("todo")}
+                    className="shrink-0 rounded p-1 text-muted-foreground/50 opacity-0 transition hover:text-[var(--holo-cyan)] group-hover:opacity-100"
+                    title="Open Mission Control"
+                  >
+                    <Play className="size-3" />
+                  </button>
                 </li>
               );
             })}

@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { formatTime12, to12h, tzName } from "@/lib/clock";
 import { resolveDayTimes } from "@/lib/prayerResolve";
+import { RichText } from "../RichText";
 
 /** JARVIS arc reactor — pure CSS spinning rings (zero GPU cost). */
 export function ArcReactor({ size = 48 }: { size?: number }) {
@@ -864,7 +865,11 @@ export function VizierTab() {
                         })}
                       </span>
                     </div>
-                    {m.content}
+                    {m.role === "assistant" ? (
+                      <RichText text={m.content} className="text-foreground/90" />
+                    ) : (
+                      <div className="whitespace-pre-wrap leading-relaxed">{m.content}</div>
+                    )}
                   </div>
                 </div>
               ))}

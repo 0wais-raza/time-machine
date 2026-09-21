@@ -36,6 +36,74 @@ export interface ScheduleBlock {
   dayOfWeek?: number; // 0..6 (Sun..Sat). When set, this is a recurring weekly block.
   color?: string; // optional override neon hex/oklch
   notes?: string;
+  /** Study planner: linked exam subject ("study" blocks only). */
+  subjectId?: string;
+}
+
+/* ----------------------------- Daily Goals ----------------------------- */
+
+export interface DailyGoal {
+  id: string;
+  title: string;
+  /** Numeric daily target. */
+  target: number;
+  /** Unit label — pages, min, reps, sessions… */
+  unit: string;
+  createdAt: string;
+  /** date(YYYY-MM-DD) -> progress value. */
+  history: Record<string, number>;
+}
+
+/* ------------------------------- Alarms -------------------------------- */
+
+export type RingtoneName = "arc" | "beacon" | "chime" | "pulse" | "radar";
+
+export const RINGTONES: { name: RingtoneName; label: string; hint: string }[] = [
+  { name: "arc", label: "Arc Reactor", hint: "Rising JARVIS sweep" },
+  { name: "beacon", label: "Beacon", hint: "Classic alert double-beep" },
+  { name: "chime", label: "Adhan Chime", hint: "Soft bell — prayer windows" },
+  { name: "pulse", label: "Heartbeat", hint: "Low sub-thump, calm focus" },
+  { name: "radar", label: "Sonar Ping", hint: "Deep-space radar echo" },
+];
+
+export interface AlarmSettings {
+  enabled: boolean;
+  ringtone: RingtoneName;
+  /** 0..1 */
+  volume: number;
+  /** Auto-stop after N seconds. */
+  durationSec: number;
+  /** Ring when a timetable block starts. */
+  onBlockStart: boolean;
+  /** Gentle chime exactly at prayer time. */
+  onPrayerTime: boolean;
+  /** Priority ring for study blocks linked to imminent exams. */
+  onExamSession: boolean;
+}
+
+export const DEFAULT_ALARM_SETTINGS: AlarmSettings = {
+  enabled: false,
+  ringtone: "arc",
+  volume: 0.7,
+  durationSec: 12,
+  onBlockStart: true,
+  onPrayerTime: true,
+  onExamSession: true,
+};
+
+/* --------------------------- Exam subjects ----------------------------- */
+
+export interface ExamSubject {
+  id: string;
+  name: string;
+  /** Semantic neon: "" | violet | pink | green | amber (matches block colors). */
+  color: string;
+  /** Exam date, YYYY-MM-DD. */
+  examDate?: string;
+  totalTopics: number;
+  masteredTopics: number;
+  /** Target study hours per week. */
+  targetHoursWeek: number;
 }
 
 export type PrayerName = "Fajr" | "Dhuhr" | "Asr" | "Maghrib" | "Isha";
@@ -165,6 +233,9 @@ interface AppState {
   recoveryBriefed: Record<string, true>;
   markRecoveryBriefed: (taskId: string) => void;
 
+  /** "goalId:date" -> one-time completion bonus paid. */
+  goalBonusPaid: Record<string, true>;
+
   profile: UserProfile;
   setProfileName: (name: string) => void;
   setProfile: (patch: Partial<UserProfile>) => void;
@@ -219,6 +290,20 @@ interface AppState {
 
   notificationsEnabled: boolean;
   setNotificationsEnabled: (b: boolean) => void;
+
+  goals: DailyGoal[];
+  addGoal: (g: { title: string; target: number; unit: string }) => void;
+  updateGoal: (id: string, patch: Partial<DailyGoal>) => void;
+  removeGoal: (id: string) => void;
+  bumpGoal: (id: string, delta: number, date?: string) => void;
+
+  alarmSettings: AlarmSettings;
+  setAlarmSetting: <K extends keyof AlarmSettings>(k: K, v: AlarmSettings[K]) => void;
+
+  examSubjects: ExamSubject[];
+  addExamSubject: (s: Omit<ExamSubject, "id">) => void;
+  updateExamSubject: (id: string, patch: Partial<ExamSubject>) => void;
+  removeExamSubject: (id: string) => void;
 }
 
 /** Credits awarded when a mission is completed, by priority. */
@@ -234,6 +319,8 @@ export const BLOCK_CREDITS = 3;
 export const PRAYER_CREDITS = 1;
 /** Bonus payout for completing all five daily prayers. */
 export const NAMAZ_BONUS_CREDITS = 10;
+/** One-time payout the first day a daily goal hits its target. */
+export const GOAL_BONUS_CREDITS = 2;
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 const today = () => new Date().toISOString().slice(0, 10);
@@ -592,6 +679,8 @@ export const useApp = create<AppState>()(
             : { recoveryBriefed: { ...s.recoveryBriefed, [taskId]: true } },
         ),
 
+      goalBonusPaid: {},
+
       profile: { name: "CyberVizier", role: "AI Engineer / Digital Creator" },
       setProfileName: (name) => set((s) => ({ profile: { ...s.profile, name } })),
       setProfile: (patch: Partial<UserProfile>) =>
@@ -765,10 +854,115 @@ export const useApp = create<AppState>()(
 
       notificationsEnabled: false,
       setNotificationsEnabled: (b) => set({ notificationsEnabled: b }),
+
+      goals: [
+        {
+          id: uid(),
+          title: "Deep-focus study",
+          target: 120,
+          unit: "min",
+          createdAt: new Date().toISOString(),
+          history: {},
+        },
+        {
+          id: uid(),
+          title: "Topics revised",
+          target: 3,
+          unit: "topics",
+          createdAt: new Date().toISOString(),
+          history: {},
+        },
+      ],
+      addGoal: (g) =>
+        set((s) => ({
+          goals: [
+            ...s.goals,
+            {
+              id: uid(),
+              title: g.title,
+              target: Math.max(1, g.target),
+              unit: g.unit || "x",
+              createdAt: new Date().toISOString(),
+              history: {},
+            },
+          ],
+        })),
+      updateGoal: (id, patch) =>
+        set((s) => ({
+          goals: s.goals.map((g) => (g.id === id ? { ...g, ...patch } : g)),
+        })),
+      removeGoal: (id) => set((s) => ({ goals: s.goals.filter((g) => g.id !== id) })),
+      bumpGoal: (id, delta, date) =>
+        set((s) => {
+          const d = date ?? today();
+          const goal = s.goals.find((g) => g.id === id);
+          if (!goal) return s;
+          const prev = goal.history[d] ?? 0;
+          const next = Math.max(0, prev + delta);
+          const goals = s.goals.map((g) =>
+            g.id === id ? { ...g, history: { ...g.history, [d]: next } } : g,
+          );
+          // One-time +2 CR bonus the first day the target is reached.
+          const bonusKey = `${id}:${d}`;
+          const crossed = prev < goal.target && next >= goal.target;
+          if (crossed && !s.goalBonusPaid[bonusKey]) {
+            return {
+              goals,
+              credits: s.credits + GOAL_BONUS_CREDITS,
+              creditHistory: {
+                ...s.creditHistory,
+                [d]: (s.creditHistory[d] ?? 0) + GOAL_BONUS_CREDITS,
+              },
+              goalBonusPaid: { ...s.goalBonusPaid, [bonusKey]: true as const },
+            };
+          }
+          // Un-completing claws the bonus back.
+          if (prev >= goal.target && next < goal.target && s.goalBonusPaid[bonusKey]) {
+            const goalBonusPaid = { ...s.goalBonusPaid };
+            delete goalBonusPaid[bonusKey];
+            return {
+              goals,
+              credits: Math.max(0, s.credits - GOAL_BONUS_CREDITS),
+              creditHistory: {
+                ...s.creditHistory,
+                [d]: Math.max(0, (s.creditHistory[d] ?? 0) - GOAL_BONUS_CREDITS),
+              },
+              goalBonusPaid,
+            };
+          }
+          return { goals };
+        }),
+
+      alarmSettings: DEFAULT_ALARM_SETTINGS,
+      setAlarmSetting: (k, v) =>
+        set((s) => ({ alarmSettings: { ...s.alarmSettings, [k]: v } })),
+
+      examSubjects: [],
+      addExamSubject: (sub) =>
+        set((s) => ({
+          examSubjects: [
+            ...s.examSubjects,
+            {
+              ...sub,
+              totalTopics: Math.max(1, sub.totalTopics),
+              masteredTopics: Math.max(0, sub.masteredTopics),
+              id: uid(),
+            },
+          ],
+        })),
+      updateExamSubject: (id, patch) =>
+        set((s) => ({
+          examSubjects: s.examSubjects.map((x) => (x.id === id ? { ...x, ...patch } : x)),
+        })),
+      removeExamSubject: (id) =>
+        set((s) => ({
+          examSubjects: s.examSubjects.filter((x) => x.id !== id),
+          blocks: s.blocks.map((b) => (b.subjectId === id ? { ...b, subjectId: undefined } : b)),
+        })),
     }),
     {
       name: "cybertime-machine-v1",
-      version: 8,
+      version: 9,
       migrate: (state: unknown) => {
         const s = (state ?? {}) as Record<string, unknown>;
         // v7: OpenRouter key rename (client-side only, never committed).
@@ -830,6 +1024,26 @@ export const useApp = create<AppState>()(
         }
         if (s.focusTaskId === undefined) s.focusTaskId = null;
         if (s.focusStartedAt === undefined) s.focusStartedAt = null;
+        // v9: daily goals, alarm system, exam subjects.
+        if (!Array.isArray(s.goals)) s.goals = [];
+        if (!s.alarmSettings || typeof s.alarmSettings !== "object") {
+          s.alarmSettings = DEFAULT_ALARM_SETTINGS;
+        } else {
+          const a = s.alarmSettings as Record<string, unknown>;
+          const d = DEFAULT_ALARM_SETTINGS;
+          s.alarmSettings = {
+            enabled: typeof a.enabled === "boolean" ? a.enabled : d.enabled,
+            ringtone: (typeof a.ringtone === "string" ? a.ringtone : d.ringtone) as AlarmSettings["ringtone"],
+            volume: typeof a.volume === "number" ? a.volume : d.volume,
+            durationSec: typeof a.durationSec === "number" ? a.durationSec : d.durationSec,
+            onBlockStart: typeof a.onBlockStart === "boolean" ? a.onBlockStart : d.onBlockStart,
+            onPrayerTime: typeof a.onPrayerTime === "boolean" ? a.onPrayerTime : d.onPrayerTime,
+            onExamSession:
+              typeof a.onExamSession === "boolean" ? a.onExamSession : d.onExamSession,
+          };
+        }
+        if (!Array.isArray(s.examSubjects)) s.examSubjects = [];
+        if (!s.goalBonusPaid || typeof s.goalBonusPaid !== "object") s.goalBonusPaid = {};
         return s;
       },
     },
