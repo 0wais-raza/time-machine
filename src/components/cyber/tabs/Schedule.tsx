@@ -4,11 +4,7 @@ import { ScheduleMatrix } from "../ScheduleMatrix";
 import { StudyPlanner, ExamCountdownStrip } from "../StudyPlanner";
 import { usePageEntrance } from "@/hooks/useGsapMotion";
 import { HudLabel } from "../HudLabel";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, GraduationCap } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -27,7 +23,7 @@ export function ScheduleTab() {
     <div ref={ref} className="flex h-full min-h-0 flex-col gap-4">
       <div className="shrink-0">
         <PanelHeader
-          eyebrow="J.A.R.V.I.S. // Chronos"
+          eyebrow="Chronos // Timetable"
           title="Weekly Time Matrix"
           subtitle="Drag to shift, resize to stretch, tick a block to bank 3 credits."
           right={<ExamCountdownStrip />}

@@ -8,7 +8,6 @@ import {
   Settings,
   Coins,
   Flame,
-  Bot,
   type LucideIcon,
 } from "lucide-react";
 import { useMemo } from "react";
@@ -20,12 +19,11 @@ import { cn } from "@/lib/utils";
 
 const NAV_ITEMS: { key: TabKey; label: string; icon: LucideIcon }[] = [
   { key: "dashboard", label: "Command Hub", icon: LayoutDashboard },
-  { key: "namaz", label: "Spiritual Focus", icon: Moon },
-  { key: "todo", label: "Task Matrix", icon: ListChecks },
-  { key: "schedule", label: "Time Fortress", icon: CalendarClock },
-  { key: "analytics", label: "Analytics Arcade", icon: BarChart3 },
+  { key: "namaz", label: "Namaz", icon: Moon },
+  { key: "todo", label: "Tasks", icon: ListChecks },
+  { key: "schedule", label: "Timetable", icon: CalendarClock },
+  { key: "analytics", label: "Analytics", icon: BarChart3 },
   { key: "workbench", label: "Rig Armory", icon: Cpu },
-  { key: "vizier", label: "J.A.R.V.I.S.", icon: Bot },
   { key: "settings", label: "System Core", icon: Settings },
 ];
 
@@ -77,10 +75,10 @@ export function HolographicNavBar() {
           </div>
           <div className="hidden leading-none sm:block">
             <div className="text-[11px] font-bold tracking-[0.22em] text-foreground">
-              J.A.R.V.I.S.
+              CHRONOS VIZIER
             </div>
-            <div className="font-mono text-[8px] uppercase tracking-[0.3em] text-[var(--holo-cyan)]/70">
-              Chronos Vizier
+            <div className="font-mono text-[8px] uppercase tracking-[0.3em] text-[var(--accent)]/70">
+              Command Dashboard
             </div>
           </div>
         </div>

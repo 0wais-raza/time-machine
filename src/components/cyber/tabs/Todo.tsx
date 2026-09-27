@@ -454,7 +454,8 @@ export function TodoTab() {
       <div className="scroll-y-clean min-h-0 flex-1 space-y-4 pb-2">
         {tasks.length === 0 && (
           <div className="glass-panel p-8 text-center text-sm text-muted-foreground">
-            No missions logged. Issue your first directive above — or tell J.A.R.V.I.S. to add one.
+            No missions logged. Add your first one above — or let J.A.R.V.I.S. push tasks to you via
+            the bridge.
           </div>
         )}
 
@@ -488,7 +489,7 @@ export function TodoTab() {
         {openGrouped.length === 0 && overdue.length === 0 && tasks.length > 0 && (
           <div className="glass-panel flex items-center gap-2 p-6 text-sm italic text-muted-foreground">
             <CheckCircle2 className="size-4 text-[var(--holo-green)]" />
-            No open missions match — all directives executed. Well done, Sir.
+            No open missions match — everything is executed.
           </div>
         )}
 

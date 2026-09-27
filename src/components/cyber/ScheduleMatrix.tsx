@@ -94,9 +94,7 @@ function BlockCard({
     data: { block },
   });
   const examSubjects = useApp((s) => s.examSubjects);
-  const subject = block.subjectId
-    ? examSubjects.find((x) => x.id === block.subjectId)
-    : undefined;
+  const subject = block.subjectId ? examSubjects.find((x) => x.id === block.subjectId) : undefined;
   const start = toMins(block.start);
   const end = toMins(block.end);
   const top = (start / 60) * HOUR_PX;
@@ -178,10 +176,7 @@ function BlockCard({
           {done && <Check className="size-2.5" />}
         </button>
         <div
-          className={cn(
-            "font-semibold text-[11px] leading-tight truncate",
-            done && "line-through",
-          )}
+          className={cn("font-semibold text-[11px] leading-tight truncate", done && "line-through")}
         >
           {block.title}
         </div>
@@ -321,9 +316,7 @@ export function ScheduleMatrix() {
   const [resizingDraft, setResizingDraft] = useState<Record<string, number>>({});
   const now = useNow(30000);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
-  );
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
   const blocksByDay = useMemo(() => {
     const map: Record<number, ScheduleBlock[]> = {};
@@ -470,9 +463,7 @@ export function ScheduleMatrix() {
                   dayIdx={i}
                   blocks={blocksByDay[i] ?? []}
                   onSelect={(b) => setEditing(b)}
-                  onResize={(id, dMin) =>
-                    setResizingDraft((s) => ({ ...s, [id]: dMin }))
-                  }
+                  onResize={(id, dMin) => setResizingDraft((s) => ({ ...s, [id]: dMin }))}
                   onResizeEnd={() => {
                     Object.entries(resizingDraft).forEach(([id, dMin]) => {
                       const b = blocks.find((x) => x.id === id);
@@ -549,9 +540,16 @@ function BlockEditor({
         </div>
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <Label className="text-xs uppercase tracking-widest text-muted-foreground">Category</Label>
-            <Select value={category} onValueChange={(v) => setCategory(v as ScheduleBlock["category"])}>
-              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+            <Label className="text-xs uppercase tracking-widest text-muted-foreground">
+              Category
+            </Label>
+            <Select
+              value={category}
+              onValueChange={(v) => setCategory(v as ScheduleBlock["category"])}
+            >
+              <SelectTrigger className="mt-1">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="study">Study</SelectItem>
                 <SelectItem value="work">Work</SelectItem>
@@ -564,21 +562,35 @@ function BlockEditor({
           <div>
             <Label className="text-xs uppercase tracking-widest text-muted-foreground">Day</Label>
             <Select value={String(day)} onValueChange={(v) => setDay(Number(v))}>
-              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="mt-1">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 {DAY_NAMES.map((d, i) => (
-                  <SelectItem key={i} value={String(i)}>{d}</SelectItem>
+                  <SelectItem key={i} value={String(i)}>
+                    {d}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <div>
             <Label className="text-xs uppercase tracking-widest text-muted-foreground">Start</Label>
-            <Input type="time" value={start} onChange={(e) => setStart(e.target.value)} className="mt-1" />
+            <Input
+              type="time"
+              value={start}
+              onChange={(e) => setStart(e.target.value)}
+              className="mt-1"
+            />
           </div>
           <div>
             <Label className="text-xs uppercase tracking-widest text-muted-foreground">End</Label>
-            <Input type="time" value={end} onChange={(e) => setEnd(e.target.value)} className="mt-1" />
+            <Input
+              type="time"
+              value={end}
+              onChange={(e) => setEnd(e.target.value)}
+              className="mt-1"
+            />
           </div>
         </div>
         <div>
@@ -591,7 +603,9 @@ function BlockEditor({
                 className={cn(
                   "h-7 flex-1 rounded border text-[10px] uppercase tracking-widest",
                   colorClass(c.value),
-                  color === c.value ? "ring-2 ring-offset-1 ring-offset-background ring-current" : "opacity-60",
+                  color === c.value
+                    ? "ring-2 ring-offset-1 ring-offset-background ring-current"
+                    : "opacity-60",
                 )}
               >
                 {c.name}
@@ -599,15 +613,15 @@ function BlockEditor({
             ))}
           </div>
         </div>
-        {category === "study" && (
-          <SubjectSelect value={subjectId} onChange={setSubjectId} />
-        )}
+        {category === "study" && <SubjectSelect value={subjectId} onChange={setSubjectId} />}
         <div className="flex items-center justify-between pt-2">
           <Button variant="ghost" size="sm" onClick={onDelete} className="text-[var(--holo-pink)]">
             <Trash2 className="size-4 mr-1" /> Delete
           </Button>
           <div className="flex gap-2">
-            <Button variant="secondary" size="sm" onClick={onClose}>Cancel</Button>
+            <Button variant="secondary" size="sm" onClick={onClose}>
+              Cancel
+            </Button>
             <Button
               size="sm"
               onClick={() =>

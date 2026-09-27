@@ -36,8 +36,7 @@ export function resolveConflicts(
   const splitAdditions: Omit<ScheduleBlock, "id">[] = [];
 
   for (const b of existing) {
-    const day =
-      typeof b.dayOfWeek === "number" ? b.dayOfWeek : new Date(b.date).getDay();
+    const day = typeof b.dayOfWeek === "number" ? b.dayOfWeek : new Date(b.date).getDay();
     if (day !== incoming.dayOfWeek) continue;
     const bs = toMins(b.start);
     const be = toMins(b.end);

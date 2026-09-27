@@ -75,14 +75,26 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "CyberTime Machine" },
-      { name: "description", content: "CyberTime Machine is an AI-powered productivity dashboard for ultimate time accountability." },
-      { name: "author", content: "CyberVizier" },
+      {
+        name: "description",
+        content:
+          "CyberTime Machine is an AI-powered productivity dashboard for ultimate time accountability.",
+      },
+      { name: "author", content: "Chronos Vizier" },
       { property: "og:title", content: "CyberTime Machine" },
-      { property: "og:description", content: "CyberTime Machine is an AI-powered productivity dashboard for ultimate time accountability." },
+      {
+        property: "og:description",
+        content:
+          "CyberTime Machine is an AI-powered productivity dashboard for ultimate time accountability.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:title", content: "CyberTime Machine" },
-      { name: "twitter:description", content: "CyberTime Machine is an AI-powered productivity dashboard for ultimate time accountability." },
+      {
+        name: "twitter:description",
+        content:
+          "CyberTime Machine is an AI-powered productivity dashboard for ultimate time accountability.",
+      },
       { name: "theme-color", content: "#020617" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },

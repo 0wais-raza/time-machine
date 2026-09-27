@@ -4,16 +4,16 @@ import { AppShell } from "@/components/cyber/AppShell";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Chronos Vizier — AI Command Control" },
+      { title: "Chronos Vizier — Command Dashboard" },
       {
         name: "description",
         content:
-          "Tactical AI Chief of Staff: mission briefs, deep-focus timers, Namaz precision, schedule matrix, XP analytics.",
+          "Personal command dashboard: timetable focus, deep-work timers, Namaz precision, task analytics — wired to your own J.A.R.V.I.S. core.",
       },
       { property: "og:title", content: "Chronos Vizier" },
       {
         property: "og:description",
-        content: "High-performance AI command control for missions, time, and discipline.",
+        content: "Personal command dashboard for time, discipline and deep focus.",
       },
     ],
   }),

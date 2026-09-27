@@ -1,5 +1,15 @@
 import { useState, useRef, useEffect } from "react";
-import { Bell, X, CheckCheck, CalendarCheck, GraduationCap, Moon, Target, Cpu } from "lucide-react";
+import {
+  Bell,
+  X,
+  CheckCheck,
+  CalendarCheck,
+  GraduationCap,
+  Moon,
+  Target,
+  Cpu,
+  Bot,
+} from "lucide-react";
 import { useApp, type AppNotification } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
@@ -8,9 +18,9 @@ const kindMeta: Record<
   { color: string; chip: string; label: string; Icon: typeof Bell }
 > = {
   milestone: {
-    color: "text-[var(--holo-cyan)]",
-    chip: "border-[oklch(0.85_0.17_200/0.4)] bg-[oklch(0.85_0.17_200/0.08)] text-[var(--holo-cyan)]",
-    label: "Milestone",
+    color: "text-[var(--accent)]",
+    chip: "border-[oklch(0.62_0.19_260/0.4)] bg-[oklch(0.62_0.19_260/0.08)] text-[var(--accent)]",
+    label: "Progress",
     Icon: Target,
   },
   deadline: {
@@ -36,6 +46,12 @@ const kindMeta: Record<
     chip: "border-border bg-[oklch(1_1_1/0.03)] text-muted-foreground",
     label: "System",
     Icon: Cpu,
+  },
+  jarvis: {
+    color: "text-[var(--accent)]",
+    chip: "border-[oklch(0.62_0.19_260/0.45)] bg-[oklch(0.62_0.19_260/0.1)] text-[var(--accent)]",
+    label: "J.A.R.V.I.S.",
+    Icon: Bot,
   },
 };
 
@@ -70,14 +86,19 @@ export function NotificationBell() {
       <button
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          "glass-panel relative flex size-9 items-center justify-center transition duration-200 hover:border-[var(--holo-cyan)]/40",
-          open && "border-[var(--holo-cyan)]/50",
+          "glass-panel relative flex size-9 items-center justify-center transition duration-200 hover:border-[var(--accent)]/40",
+          open && "border-[var(--accent)]/50",
         )}
         aria-label={`Notifications${count ? ` (${count} unread)` : ""}`}
         aria-expanded={open}
         title="Notifications"
       >
-        <Bell className={cn("size-4 transition", count ? "text-[var(--holo-cyan)]" : "text-muted-foreground")} />
+        <Bell
+          className={cn(
+            "size-4 transition",
+            count ? "text-[var(--accent)]" : "text-muted-foreground",
+          )}
+        />
         {count > 0 && (
           <span className="absolute -top-1 -right-1 flex min-w-[18px] items-center justify-center rounded-full bg-[var(--holo-pink)] px-1 text-[9px] font-bold text-background shadow-[0_0_10px_var(--holo-pink)]">
             {count > 99 ? "99+" : count}
@@ -88,13 +109,13 @@ export function NotificationBell() {
         <div className="glass-panel absolute right-0 top-11 z-50 w-[340px] overflow-hidden">
           <div className="flex items-center justify-between border-b border-border px-3.5 py-2.5">
             <div className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-muted-foreground">
-              <span className="led-dot size-1.5" style={{ color: "var(--holo-cyan)" }} />
+              <span className="led-dot size-1.5" style={{ color: "var(--accent)" }} />
               Alert Feed ({count})
             </div>
             {count > 0 && (
               <button
                 onClick={clearNotifications}
-                className="flex items-center gap-1 font-mono text-[9px] uppercase tracking-widest text-muted-foreground transition hover:text-[var(--holo-cyan)]"
+                className="flex items-center gap-1 font-mono text-[9px] uppercase tracking-widest text-muted-foreground transition hover:text-[var(--accent)]"
               >
                 <CheckCheck className="size-3" /> Clear
               </button>
@@ -104,9 +125,9 @@ export function NotificationBell() {
             {count === 0 ? (
               <div className="px-4 py-8 text-center">
                 <Bell className="mx-auto mb-2 size-5 text-muted-foreground/40" />
-                <div className="text-xs font-medium text-foreground/70">All quiet, Sir.</div>
+                <div className="text-xs font-medium text-foreground/70">All quiet</div>
                 <div className="mt-1 text-[11px] italic text-muted-foreground">
-                  Deadlines, blocks and prayer alerts will land here.
+                  Deadlines, blocks, prayer alerts and J.A.R.V.I.S. messages land here.
                 </div>
               </div>
             ) : (

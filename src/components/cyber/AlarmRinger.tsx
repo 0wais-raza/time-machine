@@ -71,9 +71,7 @@ export function AlarmRinger() {
         </span>
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-bold text-foreground">{alarm.title}</div>
-          {alarm.body && (
-            <div className="truncate text-xs text-muted-foreground">{alarm.body}</div>
-          )}
+          {alarm.body && <div className="truncate text-xs text-muted-foreground">{alarm.body}</div>}
         </div>
         <button
           onClick={snooze}

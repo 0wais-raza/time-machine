@@ -2,8 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useApp, PRAYERS } from "@/lib/store";
 import { PanelHeader } from "../PanelHeader";
 import { HudLabel } from "../HudLabel";
-import { Button } from "@/components/ui/button";
-import { Sparkles, Coins } from "lucide-react";
+import { Coins } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -18,12 +17,10 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { buildContext, callVizier } from "@/lib/ai-core";
-import { toast } from "sonner";
-import { Gauge } from "lucide-react";
 import { todayStr } from "@/lib/store";
 import { useGsapReveal } from "@/hooks/useGsapReveal";
 import { useCountUpValue } from "@/hooks/useGsapMotion";
+import { cn } from "@/lib/utils";
 
 function lastNDays(n: number): string[] {
   const arr: string[] = [];
@@ -38,7 +35,7 @@ function lastNDays(n: number): string[] {
 const CHART_TOOLTIP = {
   contentStyle: {
     background: "oklch(0.16 0.03 260 / 0.95)",
-    border: "1px solid oklch(0.85 0.17 200 / 0.25)",
+    border: "1px solid oklch(0.62 0.19 260 / 0.25)",
     borderRadius: 10,
     fontSize: 12,
     backdropFilter: "blur(8px)",
@@ -47,7 +44,7 @@ const CHART_TOOLTIP = {
   itemStyle: { color: "var(--color-foreground)" },
 } as const;
 
-const AXIS = { stroke: "oklch(0.85 0.17 200 / 0.35)", fontSize: 10 } as const;
+const AXIS = { stroke: "oklch(0.62 0.19 260 / 0.35)", fontSize: 10 } as const;
 
 function Stat({
   label,
@@ -64,7 +61,7 @@ function Stat({
 }) {
   return (
     <div className="glass-panel relative px-4 py-3.5">
-      <span className="pointer-events-none absolute left-0 top-0 size-2 border-l-2 border-t-2 border-[var(--holo-cyan)/50]" />
+      <span className="pointer-events-none absolute left-0 top-0 size-2 border-l-2 border-t-2 border-[var(--accent)/50]" />
       <div className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.25em] text-muted-foreground">
         {icon}
         {label}
@@ -85,30 +82,23 @@ function ChartPanel({
   label,
   accent = "cyan",
   children,
-  right,
 }: {
   label: string;
   accent?: "cyan" | "violet" | "amber" | "green";
   children: React.ReactNode;
-  right?: React.ReactNode;
 }) {
   return (
     <div className="glass-panel relative p-5">
-      <span className="pointer-events-none absolute left-0 top-0 size-2.5 border-l-2 border-t-2 border-[var(--holo-cyan)/60]" />
-      <span className="pointer-events-none absolute right-0 top-0 size-2.5 border-r-2 border-t-2 border-[var(--holo-cyan)/60]" />
-      <span className="pointer-events-none absolute bottom-0 left-0 size-2.5 border-b-2 border-l-2 border-[var(--holo-cyan)/60]" />
-      <span className="pointer-events-none absolute bottom-0 right-0 size-2.5 border-b-2 border-r-2 border-[var(--holo-cyan)/60]" />
+      <span className="pointer-events-none absolute left-0 top-0 size-2.5 border-l-2 border-t-2 border-[var(--accent)/60]" />
+      <span className="pointer-events-none absolute right-0 top-0 size-2.5 border-r-2 border-t-2 border-[var(--accent)/60]" />
+      <span className="pointer-events-none absolute bottom-0 left-0 size-2.5 border-b-2 border-l-2 border-[var(--accent)/60]" />
+      <span className="pointer-events-none absolute bottom-0 right-0 size-2.5 border-b-2 border-r-2 border-[var(--accent)/60]" />
       <div className="mb-4 flex items-center justify-between gap-3">
         <HudLabel accent={accent}>{label}</HudLabel>
-        {right}
       </div>
       {children}
     </div>
   );
-}
-
-function cn(...parts: (string | undefined | false)[]) {
-  return parts.filter(Boolean).join(" ");
 }
 
 export function AnalyticsTab() {
@@ -119,9 +109,7 @@ export function AnalyticsTab() {
   const completedBlocks = app.completedBlocks ?? {};
   const creditHistory = app.creditHistory ?? {};
   const credits = app.credits ?? 0;
-  const { sessions, activeSessionId, settings } = app;
-  const [summary, setSummary] = useState<string>("");
-  const [busy, setBusy] = useState(false);
+  const goals = app.goals ?? [];
   const gridRef = useGsapReveal<HTMLDivElement>("analytics");
 
   const creditDaily = useMemo(
@@ -167,17 +155,17 @@ export function AnalyticsTab() {
   const score = useMemo(() => {
     const totalTasks = tasks.length || 1;
     const taskPct = tasks.filter((t) => t.done).length / totalTasks;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayStr();
     const todayP = prayers[today] ?? {};
     const prayerPct = Object.values(todayP).filter(Boolean).length / 5;
-    const totalBlocks = blocks.length || 1;
-    const adherence = Math.min(
-      1,
-      blocks.filter((b) => b.date === today).length /
-        Math.max(1, blocks.filter((b) => b.date === today).length),
+    const dow = new Date().getDay();
+    const todays = blocks.filter((b) =>
+      typeof b.dayOfWeek === "number" ? b.dayOfWeek === dow : b.date === today,
     );
-    return Math.round((taskPct * 0.5 + adherence * 0.3 + prayerPct * 0.2) * 100);
-  }, [tasks, prayers, blocks]);
+    const doneIds = completedBlocks[today] ?? [];
+    const adherence = todays.length ? doneIds.length / todays.length : 0;
+    return Math.round((taskPct * 0.4 + adherence * 0.4 + prayerPct * 0.2) * 100);
+  }, [tasks, prayers, blocks, completedBlocks]);
 
   const velocity = useMemo(() => {
     const today = todayStr();
@@ -208,52 +196,45 @@ export function AnalyticsTab() {
   const velocityAnim = useCountUpValue(velocity.pct, { duration: 1.1, disabled: !mounted });
   const creditsAnim = useCountUpValue(credits, { duration: 1.1, disabled: !mounted });
 
-  const ask = async () => {
-    setBusy(true);
-    setSummary("");
-    try {
-      const ctx = buildContext({
-        tasks,
-        blocks,
-        prayers,
-        credits,
-        creditHistory,
-        completedBlocks,
-        mode: "analytics-summary",
-      });
-      const session = sessions.find((s) => s.id === activeSessionId) ?? sessions[0];
-      const recent = session?.messages.slice(-3) ?? [];
-      const reply = await callVizier(
-        [
-          ...recent,
-          {
-            id: "ana",
-            role: "user",
-            content:
-              "Analyze my performance bottlenecks across tasks, schedule, and namaz consistency. Give a sharp 4-sentence executive brief. No actions.",
-            createdAt: new Date().toISOString(),
-          },
-        ],
-        ctx,
-        undefined,
-        { maxTokens: settings.aiDepth === "deep" ? 1400 : 600 },
-      );
-      setSummary(reply.message);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Unknown error";
-      toast.error(msg);
-      setSummary(`System fault: ${msg}`);
-    } finally {
-      setBusy(false);
-    }
-  };
+  // Local "weekly consistency" summary — pure math, no AI.
+  const consistency = useMemo(() => {
+    const last7 = lastNDays(7);
+    const prayerDays = last7.filter(
+      (d) => PRAYERS.filter((p) => prayers[d]?.[p.name]).length === 5,
+    ).length;
+    const taskDays = last7.filter((d) =>
+      tasks.some((t) => t.done && t.completedAt?.slice(0, 10) === d),
+    ).length;
+    const bestDay = weekly.reduce(
+      (best, w) => (w.productivity > best.productivity ? w : best),
+      weekly[0] ?? { day: "—", productivity: 0 },
+    );
+    const lines: string[] = [];
+    lines.push(
+      prayerDays >= 5
+        ? `Prayer discipline is elite — ${prayerDays}/7 full cycles this week.`
+        : prayerDays >= 3
+          ? `Prayer cycle hit ${prayerDays}/7 days — protect the weak windows.`
+          : `Prayer cycle only ${prayerDays}/7 days this week — anchor the five windows first.`,
+    );
+    lines.push(
+      taskDays >= 5
+        ? `Task execution on ${taskDays}/7 days — momentum is real.`
+        : `Task execution on ${taskDays}/7 days — one finished task per day keeps the streak alive.`,
+    );
+    if (bestDay?.productivity > 0)
+      lines.push(`${bestDay.day} was your strongest day — schedule deep work there.`);
+    const topGoal = goals.find((g) => (g.history[todayStr()] ?? 0) >= g.target);
+    if (topGoal) lines.push(`Goal "${topGoal.title}" already hit today — banked.`);
+    return lines;
+  }, [prayers, tasks, weekly, goals]);
 
   return (
     <div>
       <PanelHeader
-        eyebrow="J.A.R.V.I.S. // Telemetry"
-        title="Analytics Arcade"
-        subtitle="Performance, consistency and credit flow — decoded."
+        eyebrow="Telemetry"
+        title="Analytics"
+        subtitle="Performance, consistency and credit flow — computed locally."
       />
 
       {/* Telemetry strip */}
@@ -266,7 +247,7 @@ export function AnalyticsTab() {
             score >= 70
               ? "text-[var(--holo-green)]"
               : score >= 40
-                ? "text-[var(--holo-cyan)]"
+                ? "text-[var(--accent)]"
                 : "text-[var(--holo-pink)]"
           }
         />
@@ -275,7 +256,6 @@ export function AnalyticsTab() {
           value={`${Math.round(velocityAnim)}%`}
           sub={`${velocity.done} done / ${velocity.planned} blocks`}
           accent="text-[var(--holo-violet)]"
-          icon={<Gauge className="size-3" />}
         />
         <Stat
           label="Cyber Credits"
@@ -292,18 +272,18 @@ export function AnalyticsTab() {
             <AreaChart data={creditDaily}>
               <defs>
                 <linearGradient id="cr" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--holo-cyan)" stopOpacity={0.45} />
-                  <stop offset="100%" stopColor="var(--holo-cyan)" stopOpacity={0} />
+                  <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.45} />
+                  <stop offset="100%" stopColor="var(--accent)" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.85 0.17 200 / 0.08)" />
+              <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.62 0.19 260 / 0.08)" />
               <XAxis dataKey="day" {...AXIS} interval={1} />
               <YAxis {...AXIS} allowDecimals={false} />
               <Tooltip {...CHART_TOOLTIP} />
               <Area
                 type="monotone"
                 dataKey="credits"
-                stroke="var(--holo-cyan)"
+                stroke="var(--accent)"
                 strokeWidth={2}
                 fill="url(#cr)"
               />
@@ -314,10 +294,10 @@ export function AnalyticsTab() {
         <ChartPanel label="Weekly Credit Yield" accent="amber">
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={creditWeekly}>
-              <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.85 0.17 200 / 0.08)" />
+              <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.62 0.19 260 / 0.08)" />
               <XAxis dataKey="week" {...AXIS} />
               <YAxis {...AXIS} allowDecimals={false} />
-              <Tooltip {...CHART_TOOLTIP} cursor={{ fill: "oklch(0.85 0.17 200 / 0.06)" }} />
+              <Tooltip {...CHART_TOOLTIP} cursor={{ fill: "oklch(0.62 0.19 260 / 0.06)" }} />
               <Bar dataKey="credits" fill="var(--holo-amber)" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
@@ -332,7 +312,7 @@ export function AnalyticsTab() {
                   <stop offset="100%" stopColor="var(--holo-violet)" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.85 0.17 200 / 0.08)" />
+              <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.62 0.19 260 / 0.08)" />
               <XAxis dataKey="day" {...AXIS} />
               <YAxis {...AXIS} />
               <Tooltip {...CHART_TOOLTIP} />
@@ -350,16 +330,16 @@ export function AnalyticsTab() {
         <ChartPanel label="Namaz Consistency" accent="green">
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={weekly}>
-              <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.85 0.17 200 / 0.08)" />
+              <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.62 0.19 260 / 0.08)" />
               <XAxis dataKey="day" {...AXIS} />
-              <YAxis domain={[0, 5]} {...AXIS} />
+              <YAxis {...AXIS} domain={[0, 5]} />
               <Tooltip {...CHART_TOOLTIP} cursor={{ fill: "oklch(0.8 0.16 155 / 0.06)" }} />
               <Bar dataKey="prayers" fill="var(--holo-green)" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </ChartPanel>
 
-        <ChartPanel label="Mission Completion" accent="cyan">
+        <ChartPanel label="Task Completion" accent="cyan">
           <ResponsiveContainer width="100%" height={220}>
             <PieChart>
               <Pie
@@ -370,7 +350,7 @@ export function AnalyticsTab() {
                 paddingAngle={3}
                 stroke="none"
               >
-                <Cell fill="var(--holo-cyan)" />
+                <Cell fill="var(--accent)" />
                 <Cell fill="oklch(1 1 1 / 0.1)" />
               </Pie>
               <Tooltip {...CHART_TOOLTIP} />
@@ -378,7 +358,7 @@ export function AnalyticsTab() {
           </ResponsiveContainer>
           <div className="mt-2 flex justify-center gap-5 text-xs">
             <span className="flex items-center gap-1.5 text-foreground/80">
-              <span className="size-2 rounded-full bg-[var(--holo-cyan)] shadow-[0_0_6px_1px_var(--holo-cyan)]" />{" "}
+              <span className="size-2 rounded-full bg-[var(--accent)] shadow-[0_0_6px_1px_var(--accent)]" />{" "}
               Done
             </span>
             <span className="flex items-center gap-1.5 text-foreground/80">
@@ -387,25 +367,15 @@ export function AnalyticsTab() {
           </div>
         </ChartPanel>
 
-        <ChartPanel
-          label="Vizier Executive Brief"
-          accent="violet"
-          right={
-            <Button size="sm" onClick={ask} disabled={busy}>
-              <Sparkles className="size-3.5 mr-1" /> {busy ? "Analyzing…" : "Generate"}
-            </Button>
-          }
-        >
-          <div className="relative min-h-[180px] rounded-lg border border-[oklch(0.85_0.17_200/0.2)] bg-[oklch(0.1_0.02_260/0.4)] p-4 text-sm leading-relaxed whitespace-pre-wrap">
-            <span className="pointer-events-none absolute left-0 top-0 size-2 border-l-2 border-t-2 border-[var(--holo-violet)/60]" />
-            <span className="pointer-events-none absolute right-0 top-0 size-2 border-b-2 border-r-2 border-[var(--holo-violet)/60]" />
-            {summary || (
-              <span className="text-muted-foreground italic">
-                Press Generate to receive a performance brief. Requires an OpenRouter API key in
-                System Core.
-              </span>
-            )}
-          </div>
+        <ChartPanel label="Weekly Consistency Brief" accent="violet">
+          <ul className="min-h-[180px] space-y-2.5 rounded-lg border border-[oklch(0.62_0.19_260/0.2)] bg-[oklch(0.1_0.02_260/0.4)] p-4 text-sm leading-relaxed">
+            {consistency.map((line, i) => (
+              <li key={i} className="flex gap-2.5">
+                <span className="mt-[7px] size-1.5 shrink-0 rounded-full bg-[var(--accent)]" />
+                <span className="text-foreground/85">{line}</span>
+              </li>
+            ))}
+          </ul>
         </ChartPanel>
       </div>
     </div>

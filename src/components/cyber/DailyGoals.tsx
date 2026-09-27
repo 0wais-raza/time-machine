@@ -7,15 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Plus, Minus, Trash2, Target, Check } from "lucide-react";
 
 /** Animated SVG progress ring for a single goal. */
-function GoalRing({
-  pct,
-  size = 54,
-  accent,
-}: {
-  pct: number;
-  size?: number;
-  accent: string;
-}) {
+function GoalRing({ pct, size = 54, accent }: { pct: number; size?: number; accent: string }) {
   const r = (size - 8) / 2;
   const c = 2 * Math.PI * r;
   const [anim, setAnim] = useState(0);
@@ -78,7 +70,7 @@ export function DailyGoals({ compact = false }: { compact?: boolean }) {
       if (was === false && now) {
         import("sonner").then(({ toast }) => {
           toast.success(`Goal complete // ${g.title}`, {
-            description: `+${GOAL_BONUS_CREDITS} CR banked. Discipline compounding, Sir.`,
+            description: `+${GOAL_BONUS_CREDITS} CR banked. Discipline compounding.`,
           });
         });
         pushNotification({
@@ -160,8 +152,14 @@ export function DailyGoals({ compact = false }: { compact?: boolean }) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <HudLabel accent="cyan">Today's Directives · {totals.done}/{totals.total} complete</HudLabel>
-        <Button size="sm" variant={adding ? "secondary" : "ghost"} onClick={() => setAdding((v) => !v)}>
+        <HudLabel accent="cyan">
+          Today's Directives · {totals.done}/{totals.total} complete
+        </HudLabel>
+        <Button
+          size="sm"
+          variant={adding ? "secondary" : "ghost"}
+          onClick={() => setAdding((v) => !v)}
+        >
           <Plus className="size-3.5 mr-1" /> Goal
         </Button>
       </div>
@@ -175,7 +173,11 @@ export function DailyGoals({ compact = false }: { compact?: boolean }) {
             onChange={(e) => setTitle(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter" && title.trim()) {
-                addGoal({ title: title.trim(), target: parseInt(target, 10) || 1, unit: unit.trim() || "x" });
+                addGoal({
+                  title: title.trim(),
+                  target: parseInt(target, 10) || 1,
+                  unit: unit.trim() || "x",
+                });
                 setTitle("");
                 setAdding(false);
               }
@@ -199,7 +201,11 @@ export function DailyGoals({ compact = false }: { compact?: boolean }) {
             className="md:col-span-2"
             onClick={() => {
               if (!title.trim()) return;
-              addGoal({ title: title.trim(), target: parseInt(target, 10) || 1, unit: unit.trim() || "x" });
+              addGoal({
+                title: title.trim(),
+                target: parseInt(target, 10) || 1,
+                unit: unit.trim() || "x",
+              });
               setTitle("");
               setAdding(false);
             }}
@@ -229,7 +235,8 @@ export function DailyGoals({ compact = false }: { compact?: boolean }) {
               key={g.id}
               className={cn(
                 "glass-panel tilt-card group relative overflow-hidden p-4",
-                complete && "border-[oklch(0.8_0.16_155/0.4)] shadow-[0_0_24px_oklch(0.8_0.16_155/0.12)]",
+                complete &&
+                  "border-[oklch(0.8_0.16_155/0.4)] shadow-[0_0_24px_oklch(0.8_0.16_155/0.12)]",
               )}
             >
               <div className="flex items-start gap-3">
@@ -251,7 +258,11 @@ export function DailyGoals({ compact = false }: { compact?: boolean }) {
                   />
                   <div className="mt-0.5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                     {cur} / {g.target} {g.unit}
-                    {complete && <span className="ml-1.5 text-[var(--holo-green)]">· +{GOAL_BONUS_CREDITS} CR</span>}
+                    {complete && (
+                      <span className="ml-1.5 text-[var(--holo-green)]">
+                        · +{GOAL_BONUS_CREDITS} CR
+                      </span>
+                    )}
                   </div>
                 </div>
                 <button
@@ -272,7 +283,9 @@ export function DailyGoals({ compact = false }: { compact?: boolean }) {
                     style={{
                       height: `${6 + v * 18}px`,
                       background:
-                        v >= 1 ? accent : `color-mix(in oklch, ${accent} ${Math.round(v * 55)}%, transparent)`,
+                        v >= 1
+                          ? accent
+                          : `color-mix(in oklch, ${accent} ${Math.round(v * 55)}%, transparent)`,
                       opacity: v === 0 ? 0.15 : 1,
                     }}
                   />

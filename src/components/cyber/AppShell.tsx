@@ -4,14 +4,12 @@ import { usePageEntrance } from "@/hooks/useGsapMotion";
 import { Aurora } from "./Aurora";
 import { Celebration } from "./Celebration";
 import { HolographicNavBar } from "./HolographicNavBar";
-import { JarvisOrb } from "./JarvisOrb";
 import { DashboardTab } from "./tabs/Dashboard";
 import { NamazTab } from "./tabs/Namaz";
 import { TodoTab } from "./tabs/Todo";
 import { ScheduleTab } from "./tabs/Schedule";
 import { AnalyticsTab } from "./tabs/Analytics";
 import { WorkbenchTab } from "./tabs/Workbench";
-import { VizierTab } from "./tabs/Vizier";
 import { SettingsTab } from "./tabs/Settings";
 import { FocusOverlay } from "./FocusOverlay";
 import { Toaster } from "@/components/ui/sonner";
@@ -22,6 +20,7 @@ import { to12h } from "@/lib/clock";
 import { fetchPrayerTimes } from "@/lib/prayerTimes";
 import { resolveDayTimes } from "@/lib/prayerResolve";
 import { startAlarmEngine } from "@/lib/alarms";
+import { recordJournal, startBridge, stopBridge } from "@/lib/bridge";
 import { AlarmRinger } from "./AlarmRinger";
 
 const MILESTONES = [25, 50, 75, 100];
@@ -43,9 +42,6 @@ export function AppShell() {
     dispatched,
     markDispatched,
     markBlockDone,
-    recoveryBriefed,
-    markRecoveryBriefed,
-    pushToActive,
   } = useApp();
 
   // Boot: auto-fetch today's prayer times for stored coords (default Karachi).
@@ -66,6 +62,19 @@ export function AppShell() {
     startAlarmEngine();
   }, []);
 
+  // J.A.R.V.I.S. bridge lifecycle — runs only while enabled; the Python core
+  // is expected on this machine (default http://127.0.0.1:8765).
+  const bridgeEnabled = useApp((s) => s.bridgeEnabled);
+  const bridgeUrl = useApp((s) => s.bridgeUrl);
+  useEffect(() => {
+    if (!bridgeEnabled) {
+      stopBridge();
+      return;
+    }
+    startBridge();
+    return () => stopBridge();
+  }, [bridgeEnabled, bridgeUrl]);
+
   // Milestone notifications.
   const lastPctRef = useRef<number>(0);
   useEffect(() => {
@@ -81,13 +90,14 @@ export function AppShell() {
       if (pct >= m && prev < m && !fired.includes(m)) {
         const msg =
           m === 100
-            ? "All directives executed. Issue the next mission."
+            ? "All tasks executed. Issue the next mission."
             : `Daily progress crossed ${m}%. Hold the line.`;
-        toast(`Vizier // ${m}%`, { description: msg });
-        pushNotification({ kind: "milestone", title: `Vizier // ${m}%`, body: msg });
+        toast(`Progress // ${m}%`, { description: msg });
+        pushNotification({ kind: "milestone", title: `Progress // ${m}%`, body: msg });
         if (notificationsEnabled)
-          requestNotifyAndShow(`Vizier // ${m}%`, msg, { tag: `cv-milestone-${today}-${m}` });
+          requestNotifyAndShow(`Progress // ${m}%`, msg, { tag: `cv-milestone-${today}-${m}` });
         recordMilestone(today, m);
+        recordJournal("milestone", `Daily progress crossed ${m}%`, { pct: m });
       }
     }
   }, [tasks, notificationsEnabled, notifiedMilestones, recordMilestone, pushNotification]);
@@ -119,6 +129,7 @@ export function AppShell() {
             requestNotifyAndShow(`Deadline // ${t.title}`, "Execute now.", {
               tag: `cv-deadline-${t.id}`,
             });
+          recordJournal("deadline_hit", `Deadline reached: ${t.title}`, { taskId: t.id });
         }
       }
 
@@ -159,6 +170,7 @@ export function AppShell() {
             if (Notification.permission === "granted") fire();
             else requestNotifyAndShow(`Block // ${b.title}`, range, { tag });
           }
+          recordJournal("block_started", `Block started: ${b.title}`, { blockId: b.id });
         }
       }
 
@@ -183,6 +195,7 @@ export function AppShell() {
             requestNotifyAndShow(`${p.name} approaching`, `In ${diff} min`, {
               tag: `cv-prayer-${p.name}-${today}`,
             });
+          recordJournal("prayer_reminder", `${p.name} approaching in ${diff} min`);
         }
       }
     };
@@ -198,49 +211,7 @@ export function AppShell() {
     dispatched,
     markDispatched,
     pushNotification,
-  ]);
-
-  // Recovery Briefing — CRITICAL missions past due without completion trigger a
-  // one-time audit message from the Chief of Staff.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const check = () => {
-      const now = Date.now();
-      for (const t of tasks) {
-        if (t.done || t.priority !== "critical" || !t.dueDate) continue;
-        if (new Date(t.dueDate).getTime() >= now) continue;
-        if (recoveryBriefed[t.id]) continue;
-        markRecoveryBriefed(t.id);
-        const brief = `[RECOVERY BRIEFING] Sir, CRITICAL mission "${t.title}" has slipped past its deadline. Audit: (1) State the obstacle. (2) Reschedule now or terminate. (3) Confirm the corrective time block. Awaiting your directive.`;
-        pushNotification({
-          kind: "system",
-          title: `Recovery // ${t.title}`,
-          body: "Critical mission missed. Audit required.",
-        });
-        try {
-          pushToActive({
-            id: Math.random().toString(36).slice(2, 10),
-            role: "assistant",
-            content: brief,
-            createdAt: new Date().toISOString(),
-          });
-        } catch {
-          /* ignore */
-        }
-        toast(`Recovery Briefing // ${t.title}`, { description: "Critical mission missed." });
-        if (notificationsEnabled) requestNotifyAndShow("Recovery Briefing", t.title);
-      }
-    };
-    check();
-    const id = setInterval(check, 60 * 1000);
-    return () => clearInterval(id);
-  }, [
-    tasks,
-    recoveryBriefed,
-    markRecoveryBriefed,
-    pushNotification,
-    pushToActive,
-    notificationsEnabled,
+    markBlockDone,
   ]);
 
   // Celebrate a FRESH 5/5 namaz cycle (not on load for already-complete days).
@@ -260,6 +231,7 @@ export function AppShell() {
           },
         }),
       );
+      recordJournal("prayer_cycle_complete", "Full 5/5 namaz cycle logged");
     }
   }, [prayers]);
 
@@ -300,12 +272,10 @@ export function AppShell() {
             {activeTab === "schedule" && <ScheduleTab />}
             {activeTab === "analytics" && <AnalyticsTab />}
             {activeTab === "workbench" && <WorkbenchTab />}
-            {activeTab === "vizier" && <VizierTab />}
             {activeTab === "settings" && <SettingsTab />}
           </div>
         </main>
       </div>
-      <JarvisOrb />
       <AlarmRinger />
       <Celebration />
       <Toaster theme="dark" />

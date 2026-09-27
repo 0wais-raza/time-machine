@@ -119,7 +119,15 @@ export type PrayerLog = Record<string, Partial<Record<PrayerName, boolean>>>; //
 /** Per-day prayer time overrides fetched from API: date(YYYY-MM-DD) -> name -> "HH:mm". */
 export type PrayerTimes = Record<string, Partial<Record<PrayerName, string>>>;
 
-export type NotificationKind = "milestone" | "deadline" | "block" | "prayer" | "system";
+export type NotificationKind = "milestone" | "deadline" | "block" | "prayer" | "system" | "jarvis";
+
+/** Entry in the bridge activity log (System Core → JARVIS Bridge). */
+export interface BridgeLogEntry {
+  id: string;
+  at: string;
+  message: string;
+  level: "info" | "error" | "success";
+}
 
 export interface AppNotification {
   id: string;
@@ -131,22 +139,8 @@ export interface AppNotification {
   refId?: string;
 }
 
-export interface ChatMessage {
-  id: string;
-  role: "user" | "assistant" | "system";
-  content: string;
-  createdAt: string;
-}
-
-export interface ChatSession {
-  id: string;
-  title: string;
-  messages: ChatMessage[];
-  updatedAt: string;
-}
-
 export type TabKey =
-  "dashboard" | "namaz" | "todo" | "schedule" | "analytics" | "workbench" | "vizier" | "settings";
+  "dashboard" | "namaz" | "todo" | "schedule" | "analytics" | "workbench" | "settings";
 
 export interface UserProfile {
   name: string;
@@ -161,12 +155,9 @@ export interface UserMemory {
 }
 
 export type NotificationFrequency = "critical" | "all";
-export type AiDepth = "fast" | "deep";
 
 export interface AppSettings {
   notificationFrequency: NotificationFrequency;
-  aiDepth: AiDepth;
-  aiModel: string;
 }
 
 export interface GeoCoords {
@@ -229,10 +220,6 @@ interface AppState {
   startFocus: (taskId: string) => void;
   endFocus: (opts?: { complete?: boolean }) => void;
 
-  /** Recovery briefings already issued (taskId -> true) to avoid repeats. */
-  recoveryBriefed: Record<string, true>;
-  markRecoveryBriefed: (taskId: string) => void;
-
   /** "goalId:date" -> one-time completion bonus paid. */
   goalBonusPaid: Record<string, true>;
 
@@ -265,28 +252,39 @@ interface AppState {
   dispatched: Record<string, true>;
   markDispatched: (key: string) => void;
 
-  bootGreetedSession: string | null;
-  markBootGreeted: (sessionId: string) => void;
-
   /** Per-day fired milestone thresholds, to avoid duplicate notifications. */
   notifiedMilestones: Record<string, number[]>;
   recordMilestone: (date: string, threshold: number) => void;
 
-  openrouterKey: string;
-  setOpenrouterKey: (k: string) => void;
-
-  chat: ChatMessage[];
-  pushChat: (m: ChatMessage) => void;
-  clearChat: () => void;
-
-  sessions: ChatSession[];
-  activeSessionId: string;
-  newSession: () => string;
-  deleteSession: (id: string) => void;
-  selectSession: (id: string) => void;
-  renameSession: (id: string, title: string) => void;
-  pushToActive: (m: ChatMessage) => void;
-  clearActive: () => void;
+  /* ------------------------ J.A.R.V.I.S. bridge ------------------------
+   * The user's own Python AI core runs a tiny HTTP server on this machine.
+   * This GUI polls it for events (notifications, tasks, blocks) and streams
+   * back a journal of everything the operator does. See JARVIS-BRIDGE.md.
+   */
+  bridgeEnabled: boolean;
+  bridgeUrl: string;
+  bridgePairingKey: string;
+  /** Runtime connection state (not persisted). */
+  bridgeStatus: "offline" | "connecting" | "online";
+  bridgeLastSyncAt: string | null;
+  bridgeLastError: string | null;
+  /** Recent bridge activity, shown in System Core. */
+  bridgeLog: BridgeLogEntry[];
+  setBridgeConfig: (
+    patch: Partial<
+      Pick<
+        AppState,
+        | "bridgeEnabled"
+        | "bridgeUrl"
+        | "bridgePairingKey"
+        | "bridgeStatus"
+        | "bridgeLastSyncAt"
+        | "bridgeLastError"
+      >
+    >,
+  ) => void;
+  pushBridgeLog: (message: string, level?: BridgeLogEntry["level"]) => void;
+  regenerateBridgeKey: () => void;
 
   notificationsEnabled: boolean;
   setNotificationsEnabled: (b: boolean) => void;
@@ -335,7 +333,7 @@ export const useApp = create<AppState>()(
         {
           id: uid(),
           title: "Ship CyberTime Machine v1",
-          description: "Polish UI, wire Vizier agent, validate flows.",
+          description: "Polish UI, wire the JARVIS bridge, validate flows.",
           priority: "critical",
           tags: ["build", "launch"],
           dueDate: new Date(Date.now() + 86400000).toISOString(),
@@ -671,17 +669,9 @@ export const useApp = create<AppState>()(
           };
         }),
 
-      recoveryBriefed: {},
-      markRecoveryBriefed: (taskId) =>
-        set((s) =>
-          s.recoveryBriefed[taskId]
-            ? s
-            : { recoveryBriefed: { ...s.recoveryBriefed, [taskId]: true } },
-        ),
-
       goalBonusPaid: {},
 
-      profile: { name: "CyberVizier", role: "AI Engineer / Digital Creator" },
+      profile: { name: "Operator", role: "Student / Builder" },
       setProfileName: (name) => set((s) => ({ profile: { ...s.profile, name } })),
       setProfile: (patch: Partial<UserProfile>) =>
         set((s) => ({ profile: { ...s.profile, ...patch } })),
@@ -693,11 +683,7 @@ export const useApp = create<AppState>()(
         })),
       clearMemoryNotes: () => set((s) => ({ memory: { ...s.memory, notes: [] } })),
 
-      settings: {
-        notificationFrequency: "critical",
-        aiDepth: "fast",
-        aiModel: "openrouter/auto",
-      },
+      settings: { notificationFrequency: "critical" },
       setSetting: (k, v) => set((s) => ({ settings: { ...s.settings, [k]: v } })),
 
       prayerTimes: {},
@@ -742,9 +728,6 @@ export const useApp = create<AppState>()(
       markDispatched: (key) =>
         set((s) => (s.dispatched[key] ? s : { dispatched: { ...s.dispatched, [key]: true } })),
 
-      bootGreetedSession: null,
-      markBootGreeted: (sessionId) => set({ bootGreetedSession: sessionId }),
-
       notifiedMilestones: {},
       recordMilestone: (date, threshold) =>
         set((s) => {
@@ -758,99 +741,30 @@ export const useApp = create<AppState>()(
           };
         }),
 
-      openrouterKey: "",
-      setOpenrouterKey: (k) => set({ openrouterKey: k }),
-
-      chat: [
-        {
-          id: uid(),
-          role: "assistant",
-          content:
-            "I am the Vizier. State your objective. I will enforce your schedule with absolute discipline.",
-          createdAt: new Date().toISOString(),
-        },
-      ],
-      pushChat: (m) => set((s) => ({ chat: [...s.chat, m] })),
-      clearChat: () => set({ chat: [] }),
-
-      ...(() => {
-        const sid = uid();
-        return {
-          sessions: [
-            {
-              id: sid,
-              title: "Today's Focus",
-              updatedAt: new Date().toISOString(),
-              messages: [
-                {
-                  id: uid(),
-                  role: "assistant" as const,
-                  content:
-                    "I am the Vizier. State your objective. I will enforce your schedule with absolute discipline.",
-                  createdAt: new Date().toISOString(),
-                },
-              ],
-            },
-          ],
-          activeSessionId: sid,
-        };
-      })(),
-      newSession: () => {
-        const id = uid();
-        const session: ChatSession = {
-          id,
-          title: "New Directive",
-          updatedAt: new Date().toISOString(),
-          messages: [
-            {
-              id: uid(),
-              role: "assistant",
-              content: "Fresh channel open. State the objective.",
-              createdAt: new Date().toISOString(),
-            },
-          ],
-        };
-        set((s) => ({ sessions: [session, ...s.sessions], activeSessionId: id }));
-        return id;
-      },
-      deleteSession: (id) =>
-        set((s) => {
-          const rest = s.sessions.filter((x) => x.id !== id);
-          const active = s.activeSessionId === id ? (rest[0]?.id ?? "") : s.activeSessionId;
-          return { sessions: rest, activeSessionId: active };
-        }),
-      selectSession: (id) => set({ activeSessionId: id }),
-      renameSession: (id, title) =>
+      // J.A.R.V.I.S. bridge — on by default; if Python isn't running the
+      // poller backs off quietly and System Core shows "offline".
+      bridgeEnabled: true,
+      bridgeUrl: "http://127.0.0.1:8765",
+      bridgePairingKey: "",
+      bridgeStatus: "offline",
+      bridgeLastSyncAt: null,
+      bridgeLastError: null,
+      bridgeLog: [],
+      setBridgeConfig: (patch) => set(patch),
+      pushBridgeLog: (message, level = "info") =>
         set((s) => ({
-          sessions: s.sessions.map((x) => (x.id === id ? { ...x, title } : x)),
+          bridgeLog: [
+            { id: uid(), at: new Date().toISOString(), message, level },
+            ...s.bridgeLog,
+          ].slice(0, 40),
         })),
-      pushToActive: (m) =>
+      regenerateBridgeKey: () =>
         set((s) => {
-          const aid = s.activeSessionId || s.sessions[0]?.id;
-          if (!aid) return s;
-          return {
-            sessions: s.sessions.map((x) =>
-              x.id === aid
-                ? {
-                    ...x,
-                    messages: [...x.messages, m],
-                    updatedAt: new Date().toISOString(),
-                    title:
-                      x.messages.filter((mm) => mm.role === "user").length === 0 &&
-                      m.role === "user"
-                        ? m.content.slice(0, 40)
-                        : x.title,
-                  }
-                : x,
-            ),
-          };
+          const bytes = new Uint8Array(18);
+          crypto.getRandomValues(bytes);
+          const key = `cvb_${Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("")}`;
+          return { bridgePairingKey: key };
         }),
-      clearActive: () =>
-        set((s) => ({
-          sessions: s.sessions.map((x) =>
-            x.id === s.activeSessionId ? { ...x, messages: [] } : x,
-          ),
-        })),
 
       notificationsEnabled: false,
       setNotificationsEnabled: (b) => set({ notificationsEnabled: b }),
@@ -934,8 +848,7 @@ export const useApp = create<AppState>()(
         }),
 
       alarmSettings: DEFAULT_ALARM_SETTINGS,
-      setAlarmSetting: (k, v) =>
-        set((s) => ({ alarmSettings: { ...s.alarmSettings, [k]: v } })),
+      setAlarmSetting: (k, v) => set((s) => ({ alarmSettings: { ...s.alarmSettings, [k]: v } })),
 
       examSubjects: [],
       addExamSubject: (sub) =>
@@ -962,14 +875,42 @@ export const useApp = create<AppState>()(
     }),
     {
       name: "cybertime-machine-v1",
-      version: 9,
+      version: 10,
+      partialize: (state) => {
+        // Runtime-only fields never persist.
+        const {
+          bridgeStatus: _s,
+          bridgeLastSyncAt: _t,
+          bridgeLastError: _e,
+          ...rest
+        } = state as unknown as Record<string, unknown>;
+        return rest;
+      },
       migrate: (state: unknown) => {
         const s = (state ?? {}) as Record<string, unknown>;
-        // v7: OpenRouter key rename (client-side only, never committed).
-        if (typeof s.geminiKey === "string" && typeof s.openrouterKey !== "string") {
-          s.openrouterKey = s.geminiKey;
+        // v10: remove the built-in AI chat entirely — intelligence now lives in
+        // the operator's own Python JARVIS core via the local bridge.
+        for (const k of [
+          "chat",
+          "sessions",
+          "activeSessionId",
+          "bootGreetedSession",
+          "openrouterKey",
+          "geminiKey",
+        ]) {
+          delete s[k];
         }
-        delete s.geminiKey;
+        if (s.settings && typeof s.settings === "object") {
+          const st = s.settings as Record<string, unknown>;
+          delete st.aiDepth;
+          delete st.aiModel;
+          if (typeof st.notificationFrequency !== "string") st.notificationFrequency = "critical";
+        }
+        // Bridge defaults.
+        if (typeof s.bridgeEnabled !== "boolean") s.bridgeEnabled = true;
+        if (typeof s.bridgeUrl !== "string" || !s.bridgeUrl) s.bridgeUrl = "http://127.0.0.1:8765";
+        if (typeof s.bridgePairingKey !== "string") s.bridgePairingKey = "";
+        if (!Array.isArray(s.bridgeLog)) s.bridgeLog = [];
         // v8: split purchased inventory from equipped rig parts — existing owners
         // get their first owned part per slot equipped automatically.
         if (!Array.isArray(s.equippedParts)) {
@@ -990,15 +931,7 @@ export const useApp = create<AppState>()(
           s.tasks = (s.tasks as Record<string, unknown>[]).map(({ xp: _xp, ...t }) => t);
         }
         if (!s.settings || typeof s.settings !== "object") {
-          s.settings = {
-            notificationFrequency: "critical",
-            aiDepth: "fast",
-            aiModel: "openrouter/auto",
-          };
-        } else {
-          const cur = s.settings as Record<string, unknown>;
-          if (!cur.aiModel || cur.aiModel === "google/gemini-pro-1.5")
-            cur.aiModel = "openrouter/auto";
+          s.settings = { notificationFrequency: "critical" };
         }
         delete s.pomodoro;
         if (!s.prayerTimes) s.prayerTimes = {};
@@ -1019,9 +952,7 @@ export const useApp = create<AppState>()(
           s.completedBlocks = {};
         }
         if (s.lastCompletedDate === undefined) s.lastCompletedDate = null;
-        if (!s.recoveryBriefed || typeof s.recoveryBriefed !== "object") {
-          s.recoveryBriefed = {};
-        }
+        delete s.recoveryBriefed;
         if (s.focusTaskId === undefined) s.focusTaskId = null;
         if (s.focusStartedAt === undefined) s.focusStartedAt = null;
         // v9: daily goals, alarm system, exam subjects.
@@ -1033,13 +964,14 @@ export const useApp = create<AppState>()(
           const d = DEFAULT_ALARM_SETTINGS;
           s.alarmSettings = {
             enabled: typeof a.enabled === "boolean" ? a.enabled : d.enabled,
-            ringtone: (typeof a.ringtone === "string" ? a.ringtone : d.ringtone) as AlarmSettings["ringtone"],
+            ringtone: (typeof a.ringtone === "string"
+              ? a.ringtone
+              : d.ringtone) as AlarmSettings["ringtone"],
             volume: typeof a.volume === "number" ? a.volume : d.volume,
             durationSec: typeof a.durationSec === "number" ? a.durationSec : d.durationSec,
             onBlockStart: typeof a.onBlockStart === "boolean" ? a.onBlockStart : d.onBlockStart,
             onPrayerTime: typeof a.onPrayerTime === "boolean" ? a.onPrayerTime : d.onPrayerTime,
-            onExamSession:
-              typeof a.onExamSession === "boolean" ? a.onExamSession : d.onExamSession,
+            onExamSession: typeof a.onExamSession === "boolean" ? a.onExamSession : d.onExamSession,
           };
         }
         if (!Array.isArray(s.examSubjects)) s.examSubjects = [];

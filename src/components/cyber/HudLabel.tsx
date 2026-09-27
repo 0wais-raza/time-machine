@@ -16,14 +16,14 @@ export function HudLabel({
   dot?: boolean;
 }) {
   const colors: Record<string, string> = {
-    cyan: "text-[var(--holo-cyan)]",
+    cyan: "text-[var(--accent)]",
     violet: "text-[var(--holo-violet)]",
     amber: "text-[var(--holo-amber)]",
     green: "text-[var(--holo-green)]",
     pink: "text-[var(--holo-pink)]",
   };
   const dotColor: Record<string, string> = {
-    cyan: "var(--holo-cyan)",
+    cyan: "var(--accent)",
     violet: "var(--holo-violet)",
     amber: "var(--holo-amber)",
     green: "var(--holo-green)",

@@ -39,7 +39,12 @@ function daysUntil(dateStr?: string): number | null {
 }
 
 function urgencyTone(days: number | null): { text: string; chip: string; label: string } {
-  if (days === null) return { text: "text-muted-foreground", chip: "border-border text-muted-foreground", label: "No date" };
+  if (days === null)
+    return {
+      text: "text-muted-foreground",
+      chip: "border-border text-muted-foreground",
+      label: "No date",
+    };
   if (days <= 3)
     return {
       text: "text-[var(--holo-pink)]",
@@ -59,7 +64,17 @@ function urgencyTone(days: number | null): { text: string; chip: string; label: 
   };
 }
 
-function AddSubjectDialog({ onAdd }: { onAdd: (s: { name: string; examDate?: string; totalTopics: number; targetHoursWeek: number; color: string }) => void }) {
+function AddSubjectDialog({
+  onAdd,
+}: {
+  onAdd: (s: {
+    name: string;
+    examDate?: string;
+    totalTopics: number;
+    targetHoursWeek: number;
+    color: string;
+  }) => void;
+}) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [examDate, setExamDate] = useState("");
@@ -82,25 +97,57 @@ function AddSubjectDialog({ onAdd }: { onAdd: (s: { name: string; examDate?: str
         </DialogHeader>
         <div className="space-y-3">
           <div>
-            <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">Subject</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Calculus II" className="mt-1" />
+            <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">
+              Subject
+            </Label>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Calculus II"
+              className="mt-1"
+            />
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">Exam date</Label>
-              <Input type="date" value={examDate} onChange={(e) => setExamDate(e.target.value)} className="mt-1" />
+              <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                Exam date
+              </Label>
+              <Input
+                type="date"
+                value={examDate}
+                onChange={(e) => setExamDate(e.target.value)}
+                className="mt-1"
+              />
             </div>
             <div>
-              <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">Topics</Label>
-              <Input type="number" min={1} value={topics} onChange={(e) => setTopics(e.target.value)} className="mt-1" />
+              <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                Topics
+              </Label>
+              <Input
+                type="number"
+                min={1}
+                value={topics}
+                onChange={(e) => setTopics(e.target.value)}
+                className="mt-1"
+              />
             </div>
           </div>
           <div>
-            <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">Target h/week</Label>
-            <Input type="number" min={1} value={hours} onChange={(e) => setHours(e.target.value)} className="mt-1" />
+            <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">
+              Target h/week
+            </Label>
+            <Input
+              type="number"
+              min={1}
+              value={hours}
+              onChange={(e) => setHours(e.target.value)}
+              className="mt-1"
+            />
           </div>
           <div>
-            <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">Signal color</Label>
+            <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">
+              Signal color
+            </Label>
             <div className="mt-1.5 flex gap-1.5">
               {COLORS.map((c) => (
                 <button
@@ -160,7 +207,7 @@ export function StudyPlanner({ onPickSubject }: { onPickSubject?: (id: string) =
       if (b.category !== "study" || !b.subjectId) continue;
       const [sh, sm] = b.start.split(":").map(Number);
       const [eh, em] = b.end.split(":").map(Number);
-      const mins = Math.max(0, (eh * 60 + em) - (sh * 60 + sm));
+      const mins = Math.max(0, eh * 60 + em - (sh * 60 + sm));
       map[b.subjectId] = (map[b.subjectId] ?? 0) + mins;
     }
     return map;
@@ -209,14 +256,18 @@ export function StudyPlanner({ onPickSubject }: { onPickSubject?: (id: string) =
               key={sub.id}
               className={cn(
                 "glass-panel tilt-card relative overflow-hidden p-4",
-                critical && "border-[oklch(0.72_0.24_350/0.45)] shadow-[0_0_26px_oklch(0.72_0.24_350/0.14)]",
+                critical &&
+                  "border-[oklch(0.72_0.24_350/0.45)] shadow-[0_0_26px_oklch(0.72_0.24_350/0.14)]",
               )}
             >
               {/* urgency wash */}
               {critical && (
                 <div
                   className="pointer-events-none absolute inset-0 opacity-40"
-                  style={{ background: "radial-gradient(circle at 85% 0%, oklch(0.72 0.24 350 / 0.14), transparent 55%)" }}
+                  style={{
+                    background:
+                      "radial-gradient(circle at 85% 0%, oklch(0.72 0.24 350 / 0.14), transparent 55%)",
+                  }}
                 />
               )}
               <div className="relative flex items-start justify-between gap-2">
@@ -233,7 +284,12 @@ export function StudyPlanner({ onPickSubject }: { onPickSubject?: (id: string) =
                     />
                   </div>
                   <div className="mt-1 flex items-center gap-1.5">
-                    <span className={cn("rounded-md border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.18em]", tone.chip)}>
+                    <span
+                      className={cn(
+                        "rounded-md border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.18em]",
+                        tone.chip,
+                      )}
+                    >
                       <CalendarX2 className="mr-1 inline size-2.5" />
                       {tone.label}
                     </span>
@@ -272,7 +328,11 @@ export function StudyPlanner({ onPickSubject }: { onPickSubject?: (id: string) =
                 </div>
                 <div className="mt-2 flex items-center gap-1.5">
                   <button
-                    onClick={() => updateExamSubject(sub.id, { masteredTopics: Math.max(0, sub.masteredTopics - 1) })}
+                    onClick={() =>
+                      updateExamSubject(sub.id, {
+                        masteredTopics: Math.max(0, sub.masteredTopics - 1),
+                      })
+                    }
                     className="flex size-6 items-center justify-center rounded border border-border text-muted-foreground transition hover:text-foreground"
                     title="Un-master a topic"
                   >
@@ -308,7 +368,9 @@ export function StudyPlanner({ onPickSubject }: { onPickSubject?: (id: string) =
                 {hours >= sub.targetHoursWeek ? (
                   <span className="text-[var(--holo-green)]">On pace</span>
                 ) : (
-                  <span className="text-[var(--holo-amber)]">{sub.targetHoursWeek - hours}h to go</span>
+                  <span className="text-[var(--holo-amber)]">
+                    {sub.targetHoursWeek - hours}h to go
+                  </span>
                 )}
               </div>
             </div>

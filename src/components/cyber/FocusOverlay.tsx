@@ -12,10 +12,7 @@ export function FocusOverlay() {
   const endFocus = useApp((s) => s.endFocus);
   const [now, setNow] = useState<number>(Date.now());
 
-  const task = useMemo(
-    () => tasks.find((t) => t.id === focusTaskId),
-    [tasks, focusTaskId],
-  );
+  const task = useMemo(() => tasks.find((t) => t.id === focusTaskId), [tasks, focusTaskId]);
 
   useEffect(() => {
     if (!focusTaskId) return;
@@ -52,7 +49,9 @@ export function FocusOverlay() {
         <h2 className="mt-2 text-2xl font-black tracking-tight">{task.title}</h2>
         <div className="mt-1 text-xs text-muted-foreground uppercase tracking-widest">
           Priority: {task.priority}
-          {task.estimatedMinutes ? ` • Target: ${task.estimatedMinutes}m` : " • No estimate (25m sprint)"}
+          {task.estimatedMinutes
+            ? ` • Target: ${task.estimatedMinutes}m`
+            : " • No estimate (25m sprint)"}
         </div>
 
         <div className="relative mx-auto my-8 flex items-center justify-center">
@@ -71,7 +70,14 @@ export function FocusOverlay() {
                 </feMerge>
               </filter>
             </defs>
-            <circle cx="140" cy="140" r="126" fill="none" stroke="oklch(1 1 1 / 0.06)" strokeWidth="2" />
+            <circle
+              cx="140"
+              cy="140"
+              r="126"
+              fill="none"
+              stroke="oklch(1 1 1 / 0.06)"
+              strokeWidth="2"
+            />
             <circle
               cx="140"
               cy="140"
@@ -87,9 +93,7 @@ export function FocusOverlay() {
               style={{ transition: "stroke-dashoffset 0.9s linear" }}
             />
           </svg>
-          <div
-            className="pointer-events-none absolute inset-8 animate-[holo-spin_9s_linear_infinite] rounded-full border border-dashed border-[oklch(0.85_0.17_200/0.25)]"
-          />
+          <div className="pointer-events-none absolute inset-8 animate-[holo-spin_9s_linear_infinite] rounded-full border border-dashed border-[oklch(0.85_0.17_200/0.25)]" />
           <div
             className={`pointer-events-none absolute inset-16 animate-[holo-spin-rev_6s_linear_infinite] rounded-full border border-dashed border-[oklch(0.66_0.27_295/0.3)]`}
           />

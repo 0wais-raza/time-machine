@@ -1,23 +1,32 @@
+import { useEffect, useMemo, useState } from "react";
 import { useApp, PRAYERS, todayStr } from "@/lib/store";
 import { HudLabel } from "../HudLabel";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Coins, Timer, AlertTriangle, Zap, Target, Play, BellRing } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Coins, Timer, AlertTriangle, Target, Play, BellRing } from "lucide-react";
 import { useNow, to12h } from "@/lib/clock";
-import { JarvisClock } from "../JarvisClock";
+import { CommandClock } from "../CommandClock";
+import { TodayTimeline } from "../TodayTimeline";
 import { cn } from "@/lib/utils";
 import { partById } from "@/lib/hardware";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useCountUpValue, useScanSweep, useTilt } from "@/hooks/useGsapMotion";
 import { resolveDayTimes } from "@/lib/prayerResolve";
 import { DailyGoals } from "../DailyGoals";
 import { ExamCountdownStrip } from "../StudyPlanner";
 
+/**
+ * Command Hub — redesigned around one question: "what should I be doing now?"
+ *
+ * Layout priority:
+ *   1. Clock + today's timeline (the answer, always visible)
+ *   2. Next actions (prayer cycle, next block, open missions)
+ *   3. Ambient telemetry (goals, system pulse) — quiet, at the bottom
+ */
+
 function Radial({ value, mounted }: { value: number; mounted: boolean }) {
   const r = 40;
   const c = 2 * Math.PI * r;
-  const anim = useCountUpValue(value, { duration: 1.1, disabled: !mounted });
-  const off = c - (anim / 100) * c;
+  const pct = mounted ? value : 0;
+  const off = c - (pct / 100) * c;
   return (
     <svg width="100" height="100" viewBox="0 0 100 100" className="shrink-0">
       <circle cx="50" cy="50" r={r} stroke="oklch(1 1 1 / 0.08)" strokeWidth="8" fill="none" />
@@ -25,21 +34,16 @@ function Radial({ value, mounted }: { value: number; mounted: boolean }) {
         cx="50"
         cy="50"
         r={r}
-        stroke="url(#dashg)"
+        stroke="currentColor"
         strokeWidth="8"
         fill="none"
         strokeDasharray={c}
         strokeDashoffset={off}
         strokeLinecap="round"
         transform="rotate(-90 50 50)"
-        style={{ transition: "stroke-dashoffset .25s linear" }}
+        className="text-accent"
+        style={{ transition: "stroke-dashoffset .4s ease" }}
       />
-      <defs>
-        <linearGradient id="dashg" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="var(--holo-cyan)" />
-          <stop offset="100%" stopColor="var(--holo-violet)" />
-        </linearGradient>
-      </defs>
       <text
         x="50"
         y="56"
@@ -48,7 +52,7 @@ function Radial({ value, mounted }: { value: number; mounted: boolean }) {
         fontWeight="700"
         fill="var(--color-foreground)"
       >
-        {Math.round(anim)}%
+        {Math.round(pct)}%
       </text>
     </svg>
   );
@@ -75,18 +79,17 @@ export function DashboardTab() {
     customPrayerTimes,
     togglePrayer,
     credits,
-    creditHistory,
-    streak: persistedStreak,
+    streak,
     notificationsEnabled,
     equippedParts,
     setActiveTab,
-    examSubjects,
+    bridgeEnabled,
+    bridgeStatus,
   } = useApp();
   const rigPowered = equippedParts.some((id) => partById(id)?.slot === "psu");
   const isMobile = useIsMobile();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
-  const streak = mounted ? persistedStreak : 0;
   const today = todayStr();
   const todayPrayers = prayers[today] ?? {};
   const liveTimes = resolveDayTimes(prayerTimes, customPrayerTimes, today);
@@ -95,7 +98,7 @@ export function DashboardTab() {
   const top = [...tasks].filter((t) => !t.done).slice(0, 5);
   const now = useNow(1000);
   const prayerDone = PRAYERS.filter((p) => todayPrayers[p.name]).length;
-  const earnedToday = creditHistory[today] ?? 0;
+  const earnedToday = useApp((s) => s.creditHistory[today] ?? 0);
 
   // Next prayer countdown.
   const nextPrayer = useMemo(() => {
@@ -160,21 +163,9 @@ export function DashboardTab() {
   const hour = now?.getHours() ?? 0;
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
-  // Live counters (GSAP count-up).
-  const creditsAnim = useCountUpValue(mounted ? credits : 0, { duration: 1, disabled: !mounted });
-  const streakAnim = useCountUpValue(streak, { duration: 1, disabled: !mounted });
-  const earnedAnim = useCountUpValue(earnedToday, { duration: 1, disabled: !mounted });
-
-  // Scan sweep across the JARVIS banner + priority queue.
-  const bannerScan = useScanSweep<HTMLDivElement>(true, 5.5);
-  const queueScan = useScanSweep<HTMLDivElement>(true, 7.5);
-
-  const leftTilt = useTilt(4);
-  const rightTilt = useTilt(4);
-
   // Next exam subject for the hero strip.
   const nextExam = useMemo(() => {
-    return [...examSubjects]
+    return [...useApp.getState().examSubjects]
       .map((s) => ({
         s,
         d: s.examDate
@@ -183,31 +174,22 @@ export function DashboardTab() {
       }))
       .filter((x) => x.d !== null && x.d >= 0)
       .sort((a, b) => (a.d ?? 0) - (b.d ?? 0))[0];
-  }, [examSubjects]);
+  }, [mounted]);
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-4">
-      {/* ══ HERO — command status band (namaz-hero language) ══ */}
-      <div
-        ref={bannerScan.ref}
-        className="glass-panel cyber-grid corner-brackets relative shrink-0 overflow-hidden px-5 py-4"
-      >
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[oklch(0.85_0.17_200/0.5)] to-transparent" />
-        <div
-          ref={bannerScan.beamRef}
-          className="pointer-events-none absolute inset-y-0 w-24 bg-gradient-to-r from-transparent via-[var(--holo-cyan)]/10 to-transparent"
-        />
+      {/* ══ HERO — greeting + real system status (nothing fake) ══ */}
+      <div className="glass-panel relative shrink-0 overflow-hidden px-5 py-4">
         <div className="relative flex flex-wrap items-center justify-between gap-4">
           <div className="min-w-0">
-            <div className="font-mono text-[9px] font-bold uppercase tracking-[0.3em] text-[var(--holo-cyan)]">
-              <span className="led-dot mr-2 size-1.5" style={{ color: "var(--holo-cyan)" }} />
-              J.A.R.V.I.S. // Command Hub
+            <div className="font-mono text-[9px] font-bold uppercase tracking-[0.3em] text-[var(--accent)]">
+              Command Hub
             </div>
             <div
               className="mt-1 text-xl font-bold leading-tight tracking-tight"
               suppressHydrationWarning
             >
-              {greeting}, Sir — all systems nominal
+              {greeting}
             </div>
             <div
               className="mt-0.5 font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground"
@@ -224,19 +206,20 @@ export function DashboardTab() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <StatusLine label="Core Online" on color="var(--holo-cyan)" />
-            <StatusLine label="Broadcast" on={notificationsEnabled} color="var(--holo-green)" />
-            <StatusLine label="Rig Powered" on={rigPowered} color="var(--holo-green)" />
-            {nextExam && (
-              <ExamCountdownStrip />
-            )}
+            <StatusLine
+              label="Bridge"
+              on={bridgeEnabled && bridgeStatus === "online"}
+              color="var(--holo-green)"
+            />
+            <StatusLine label="Rig" on={rigPowered} color="var(--holo-green)" />
+            {nextExam && <ExamCountdownStrip />}
             <span className="flex items-center gap-1.5 rounded-full border border-[oklch(0.82_0.16_80/0.25)] bg-[oklch(0.82_0.16_80/0.07)] px-2.5 py-1">
               <Coins className="size-3.5 text-[var(--holo-amber)]" />
               <span
                 className="font-mono-tech text-sm font-bold tabular-nums text-[var(--holo-amber)]"
                 suppressHydrationWarning
               >
-                {Math.round(creditsAnim)}
+                {credits}
               </span>
               <span className="text-[10px] text-muted-foreground">CR</span>
             </span>
@@ -244,10 +227,10 @@ export function DashboardTab() {
         </div>
       </div>
 
-      {/* ══ MAIN STAGE ══ */}
+      {/* ══ MAIN STAGE — clock + today's timeline (the focus zone) ══ */}
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-12">
-        {/* Left — mission telemetry */}
-        <div ref={leftTilt} className="flex flex-col gap-4 lg:col-span-3">
+        {/* Center-first on mobile via order; desktop: left stats, center clock+timeline */}
+        <div className="order-2 flex flex-col gap-4 lg:order-1 lg:col-span-3">
           <div className="glass-panel flex flex-col items-center justify-center gap-2 p-4">
             <HudLabel className="self-center">Mission Completion</HudLabel>
             <Radial value={pct} mounted={mounted} />
@@ -256,7 +239,7 @@ export function DashboardTab() {
                 className="font-mono-tech text-base font-bold text-[var(--holo-amber)]"
                 suppressHydrationWarning
               >
-                {Math.round(streakAnim)}
+                {streak}
               </span>
               day streak
             </div>
@@ -282,7 +265,7 @@ export function DashboardTab() {
                         d
                           ? "border-[var(--holo-green)] bg-[oklch(0.8_0.16_155/0.15)] shadow-[0_0_10px_oklch(0.8_0.16_155/0.4)]"
                           : isNext
-                            ? "border-[var(--holo-cyan)] bg-[oklch(0.85_0.17_200/0.12)]"
+                            ? "border-[var(--accent)] bg-[oklch(0.62_0.19_260/0.12)]"
                             : "border-[oklch(1_1_1/0.12)] bg-[oklch(1_1_1/0.03)]",
                       )}
                     >
@@ -298,7 +281,7 @@ export function DashboardTab() {
                         d
                           ? "text-[var(--holo-green)]"
                           : isNext
-                            ? "text-[var(--holo-cyan)]"
+                            ? "text-[var(--accent)]"
                             : "text-muted-foreground/60",
                       )}
                     >
@@ -322,33 +305,26 @@ export function DashboardTab() {
                 className="font-mono-tech text-3xl font-bold tabular-nums text-[var(--holo-amber)]"
                 suppressHydrationWarning
               >
-                +{Math.round(earnedAnim)}
+                +{earnedToday}
               </span>
               <span className="text-xs text-muted-foreground">CR earned</span>
             </div>
             <div className="mt-1 font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground/70">
-              Complete missions · blocks · namaz cycle
+              Missions · blocks · namaz cycle
             </div>
           </div>
         </div>
 
-        {/* Center — JARVIS clock */}
-        <div className="relative flex items-center justify-center overflow-hidden lg:col-span-6">
-          <div className="cyber-grid pointer-events-none absolute inset-0 opacity-50" />
-          {/* soft depth glow behind the dial */}
-          <div
-            className="pointer-events-none absolute left-1/2 top-1/2 size-[420px] -translate-x-1/2 -translate-y-1/2 rounded-full"
-            style={{
-              background:
-                "radial-gradient(circle, oklch(0.85 0.17 200 / 0.07) 0%, oklch(0.66 0.27 295 / 0.05) 38%, transparent 70%)",
-            }}
-          />
-          <div className="pointer-events-none absolute left-1/2 top-1/2 size-[300px] -translate-x-1/2 -translate-y-1/2 animate-[holo-pulse_5s_ease-in-out_infinite] rounded-full bg-[oklch(0.85_0.17_200/0.05)]" />
-          <JarvisClock size={isMobile ? 300 : 380} />
+        {/* Clock + timeline — the actual focus zone */}
+        <div className="order-1 flex flex-col items-center justify-center gap-5 py-2 lg:order-2 lg:col-span-6">
+          <CommandClock size={isMobile ? 280 : 340} />
+          <div className="w-full max-w-[520px]">
+            <TodayTimeline />
+          </div>
         </div>
 
         {/* Right — live beacons */}
-        <div ref={rightTilt} className="flex flex-col gap-4 lg:col-span-3">
+        <div className="order-3 flex flex-col gap-4 lg:col-span-3">
           <div className="glass-panel p-4">
             <HudLabel accent="amber" className="mb-2">
               Schedule Beacon
@@ -412,62 +388,36 @@ export function DashboardTab() {
 
           <div className="glass-panel p-4">
             <HudLabel accent="cyan" className="mb-2">
-              Vizier Standing Orders
+              Standing Orders
             </HudLabel>
             <ul className="space-y-1.5 text-[12px] leading-relaxed text-foreground/80">
               <li className="flex gap-2">
-                <span className="text-[var(--holo-cyan)]">▸</span> One mission at a time — deep
-                focus.
+                <span className="text-[var(--accent)]">▸</span> One mission at a time — deep focus.
               </li>
               <li className="flex gap-2">
-                <span className="text-[var(--holo-cyan)]">▸</span> Protect the namaz windows at all
-                cost.
+                <span className="text-[var(--accent)]">▸</span> Protect the namaz windows.
               </li>
               <li className="flex gap-2">
-                <span className="text-[var(--holo-cyan)]">▸</span> End the day with a 5/5 cycle
-                &amp; banked credits.
+                <span className="text-[var(--accent)]">▸</span> End the day with a 5/5 cycle banked.
               </li>
             </ul>
           </div>
         </div>
       </div>
 
-      {/* ══ LOWER DECK — goals + quick actions ══ */}
+      {/* ══ LOWER DECK — goals + system pulse ══ */}
       <div className="grid shrink-0 grid-cols-1 gap-4 xl:grid-cols-12">
-        <div className="xl:col-span-5">
+        <div className="xl:col-span-7">
           <DailyGoals compact />
         </div>
-        <div className="glass-panel flex flex-col justify-center gap-2.5 p-4 xl:col-span-3">
-          <HudLabel accent="violet" className="mb-1">
-            Quick Actions
-          </HudLabel>
-          <button
-            onClick={() => setActiveTab("todo")}
-            className="clip-angular flex items-center gap-2 border border-[oklch(0.85_0.17_200/0.25)] bg-[oklch(0.85_0.17_200/0.06)] px-3 py-2 text-xs font-medium text-[var(--holo-cyan)] transition hover:bg-[oklch(0.85_0.17_200/0.14)]"
-          >
-            <Target className="size-3.5" /> Issue new mission
-          </button>
-          <button
-            onClick={() => setActiveTab("schedule")}
-            className="clip-angular flex items-center gap-2 border border-[oklch(0.66_0.27_295/0.3)] bg-[oklch(0.66_0.27_295/0.06)] px-3 py-2 text-xs font-medium text-[var(--holo-violet)] transition hover:bg-[oklch(0.66_0.27_295/0.14)]"
-          >
-            <Timer className="size-3.5" /> Plan study block
-          </button>
-          <button
-            onClick={() => setActiveTab("vizier")}
-            className="clip-angular flex items-center gap-2 border border-[oklch(0.82_0.16_80/0.3)] bg-[oklch(0.82_0.16_80/0.06)] px-3 py-2 text-xs font-medium text-[var(--holo-amber)] transition hover:bg-[oklch(0.82_0.16_80/0.14)]"
-          >
-            <Zap className="size-3.5" /> Ask J.A.R.V.I.S.
-          </button>
-        </div>
-        <div className="glass-panel flex flex-col justify-center p-4 xl:col-span-4">
+        <div className="glass-panel flex flex-col justify-center p-4 xl:col-span-5">
           <HudLabel accent="green" className="mb-2">
             System Pulse
           </HudLabel>
           <div className="grid grid-cols-3 gap-3 text-center">
             <div>
               <div
-                className="font-mono-tech text-xl font-bold tabular-nums text-[var(--holo-cyan)]"
+                className="font-mono-tech text-xl font-bold tabular-nums text-[var(--accent)]"
                 suppressHydrationWarning
               >
                 {tasks.filter((t) => !t.done).length}
@@ -481,10 +431,13 @@ export function DashboardTab() {
                 className="font-mono-tech text-xl font-bold tabular-nums text-[var(--holo-violet)]"
                 suppressHydrationWarning
               >
-                {blocks.filter((b) => {
-                  const d = typeof b.dayOfWeek === "number" ? b.dayOfWeek : new Date(b.date).getDay();
-                  return d === (now?.getDay() ?? 0);
-                }).length}
+                {
+                  blocks.filter((b) => {
+                    const d =
+                      typeof b.dayOfWeek === "number" ? b.dayOfWeek : new Date(b.date).getDay();
+                    return d === (now?.getDay() ?? 0);
+                  }).length
+                }
               </div>
               <div className="font-mono text-[8px] uppercase tracking-[0.2em] text-muted-foreground">
                 Blocks today
@@ -510,21 +463,17 @@ export function DashboardTab() {
       </div>
 
       {/* ══ Priority queue strip ══ */}
-      <div ref={queueScan.ref} className="glass-panel relative shrink-0 overflow-hidden p-4">
-        <div
-          ref={queueScan.beamRef}
-          className="pointer-events-none absolute inset-y-0 w-24 bg-gradient-to-r from-transparent via-[var(--holo-violet)]/8 to-transparent"
-        />
+      <div className="glass-panel relative shrink-0 p-4">
         <div className="mb-3 flex items-center justify-between">
           <HudLabel accent="violet">Priority Queue</HudLabel>
           <span className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground">
-            {top.length} open · {done}/{tasks.length} executed
+            {top.length} open · {done}/{tasks.length} done
           </span>
         </div>
         {top.length === 0 ? (
           <div className="flex items-center gap-2 text-sm italic text-muted-foreground">
-            <Zap className="size-3.5 text-[var(--holo-cyan)]" />
-            Queue clear — issue new directives to J.A.R.V.I.S.
+            <Target className="size-3.5 text-[var(--accent)]" />
+            Queue clear — add your next mission in Task Control.
           </div>
         ) : (
           <ul className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
@@ -534,13 +483,16 @@ export function DashboardTab() {
                 <li
                   key={t.id}
                   className={cn(
-                    "flex items-center gap-3 rounded-lg border px-3 py-2.5 transition hover:border-[oklch(0.85_0.17_200/0.4)] hover:bg-[oklch(0.85_0.17_200/0.04)]",
+                    "flex items-center gap-3 rounded-lg border px-3 py-2.5 transition hover:border-[oklch(0.62_0.19_260/0.4)] hover:bg-[oklch(0.62_0.19_260/0.04)]",
                     t.priority === "critical"
                       ? "border-[oklch(0.72_0.24_350/0.35)] bg-[oklch(0.72_0.24_350/0.05)]"
                       : "border-[oklch(1_1_1/0.05)] bg-[oklch(1_1_1/0.02)]",
                   )}
                 >
-                  <Checkbox checked={t.done} onCheckedChange={() => useApp.getState().toggleTask(t.id)} />
+                  <Checkbox
+                    checked={t.done}
+                    onCheckedChange={() => useApp.getState().toggleTask(t.id)}
+                  />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm text-foreground/90">{t.title}</div>
                     <div className="mt-0.5 flex items-center gap-2">
@@ -559,7 +511,7 @@ export function DashboardTab() {
                   </div>
                   <button
                     onClick={() => setActiveTab("todo")}
-                    className="shrink-0 rounded p-1 text-muted-foreground/50 opacity-0 transition hover:text-[var(--holo-cyan)] group-hover:opacity-100"
+                    className="shrink-0 rounded p-1 text-muted-foreground/50 transition hover:text-[var(--accent)]"
                     title="Open Mission Control"
                   >
                     <Play className="size-3" />
@@ -577,7 +529,7 @@ export function DashboardTab() {
 function PriorityChip({ p }: { p: "low" | "medium" | "high" | "critical" }) {
   const map = {
     low: "border-[oklch(1_1_1/0.1)] text-muted-foreground",
-    medium: "border-[oklch(0.85_0.17_200/0.4)] text-[var(--holo-cyan)]",
+    medium: "border-[oklch(0.62_0.19_260/0.4)] text-[var(--accent)]",
     high: "border-[oklch(0.66_0.27_295/0.5)] text-[var(--holo-violet)]",
     critical: "border-[oklch(0.72_0.24_350/0.5)] text-[var(--holo-pink)]",
   } as const;

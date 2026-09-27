@@ -13,8 +13,11 @@ let timer: number | null = null;
 let snoozeTimer: number | null = null;
 
 /** Last fired alarm — kept so Snooze can re-ring it. */
-let lastAlarm: { ringtone: Parameters<typeof playRingtone>[0]; volume: number; durationSec: number } | null =
-  null;
+let lastAlarm: {
+  ringtone: Parameters<typeof playRingtone>[0];
+  volume: number;
+  durationSec: number;
+} | null = null;
 
 function minsOf(hhmm: string): number {
   const [h, m] = hhmm.split(":").map(Number);
@@ -57,15 +60,23 @@ function tick() {
         const subject = isStudy ? s.examSubjects.find((x) => x.id === b.subjectId) : undefined;
         if (isStudy && subject && s.alarmSettings.onExamSession) {
           const days = subject.examDate
-            ? Math.ceil((new Date(subject.examDate + "T23:59:59").getTime() - now.getTime()) / 86400000)
+            ? Math.ceil(
+                (new Date(subject.examDate + "T23:59:59").getTime() - now.getTime()) / 86400000,
+              )
             : null;
           fire(
             `block:${b.id}`,
             `Study Alarm // ${subject.name}`,
-            days !== null ? `${b.title} — exam in ${days}d. Lock in.` : `${b.title} — session starting now.`,
+            days !== null
+              ? `${b.title} — exam in ${days}d. Lock in.`
+              : `${b.title} — session starting now.`,
           );
         } else {
-          fire(`block:${b.id}`, `Block Alarm // ${b.title}`, `${b.start} — scheduled block starting.`);
+          fire(
+            `block:${b.id}`,
+            `Block Alarm // ${b.title}`,
+            `${b.start} — scheduled block starting.`,
+          );
         }
       }
     }
@@ -77,7 +88,7 @@ function tick() {
     for (const p of PRAYERS) {
       const t = dayTimes[p.name] ?? p.time;
       if (minsOf(t) === nowMins) {
-        fire(`prayer:${p.name}`, `${p.name} Adhan`, `It's ${t} — prayer window open, Sir.`);
+        fire(`prayer:${p.name}`, `${p.name} Adhan`, `It's ${t} — prayer window open.`);
       }
     }
   }
@@ -118,6 +129,6 @@ export function snoozeAlarm(minutes = 5) {
   useApp.getState().pushNotification({
     kind: "system",
     title: "Alarm snoozed",
-    body: `Ringing again in ${minutes} minutes, Sir.`,
+    body: `Ringing again in ${minutes} minutes.`,
   });
 }

@@ -54,7 +54,15 @@ function getMaster(c: AudioContext, volume: number): GainNode {
 }
 
 /** Soft-clip envelope helper — plucks a gain node with fast attack, exp decay. */
-function pluck(c: AudioContext, dest: AudioNode, at: number, freq: number, dur: number, peak: number, type: OscillatorType = "sine") {
+function pluck(
+  c: AudioContext,
+  dest: AudioNode,
+  at: number,
+  freq: number,
+  dur: number,
+  peak: number,
+  type: OscillatorType = "sine",
+) {
   const osc = c.createOscillator();
   const g = c.createGain();
   osc.type = type;

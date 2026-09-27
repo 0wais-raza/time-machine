@@ -182,8 +182,8 @@ export function AlarmSettingsPanel() {
           </div>
           <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
             Ringtones are synthesized in the browser (zero downloads). Click selects; the play
-            button previews. Alarms ring while the app is open — pair with Broadcast
-            notifications for closed-tab alerts.
+            button previews. Alarms ring while the app is open — pair with Broadcast notifications
+            for closed-tab alerts.
           </p>
         </div>
       </div>
